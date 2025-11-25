@@ -42,3 +42,10 @@
 .prose > :last-child {
   margin-bottom: 0;
 }
+
+/* Prevent character breaking in user chat messages */
+.user-message-text {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  white-space: normal !important;
+}
