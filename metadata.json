@@ -1,0 +1,7 @@
+{
+  "name": "ZoTongue AI",
+  "description": "A specialized AI chat, translation, and study tool for Zo languages (Paite, Thadou, Hmar, Vaiphei, Mizo) and English, utilizing Gemini 3 Pro.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
