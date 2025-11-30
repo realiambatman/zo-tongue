@@ -1,51 +1,116 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { AppMode } from "../types";
 
 interface LandingPageProps {
   onNavigate: (mode: AppMode) => void;
 }
 
+// Stagger animation helper
+const staggerDelay = (index: number) => ({
+  animationDelay: `${index * 100}ms`,
+});
+
 export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
+
+  const tools = [
+    {
+      mode: AppMode.CHAT,
+      title: "Native Chat",
+      description: "Fluent conversation in Paite, Thadou, Hmar, Mizo, and more native languages.",
+      cta: "Start Chatting",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+      ),
+    },
+    {
+      mode: AppMode.TRANSLATE,
+      title: "Deep Translate",
+      description: "High-accuracy bidirectional translation between English and local dialects.",
+      cta: "Translate Now",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+        </svg>
+      ),
+    },
+    {
+      mode: AppMode.STUDY,
+      title: "Study Companion",
+      description: "Paste any text to get instant summaries and AI-generated quiz questions.",
+      cta: "Start Learning",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      ),
+    },
+    {
+      mode: AppMode.SOLVER,
+      title: "Smart Solver",
+      description: "Stuck on a problem? Snap a photo and get detailed step-by-step solutions.",
+      cta: "Solve Now",
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-canvas flex flex-col overflow-x-hidden">
+      {/* ========================================
+          NAVIGATION - Minimal & Clean
+          ======================================== */}
+      <nav className="sticky top-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
+            {/* Logo */}
             <div
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2.5 cursor-pointer group"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-brand-600 to-brand-500 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-md shadow-brand-500/20">
+              <div className="w-9 h-9 bg-ink rounded-xl flex items-center justify-center text-white font-display font-bold text-lg transition-transform duration-300 group-hover:scale-105">
                 Z
               </div>
-              <span className="text-lg font-bold text-slate-900 tracking-tight">
-                ZoTongue<span className="text-brand-600">AI</span>
+              <span className="font-display text-lg font-bold tracking-tight text-ink">
+                ZoTongue<span className="text-accent">AI</span>
               </span>
             </div>
-            <div className="hidden md:flex space-x-8">
+
+            {/* Desktop Nav Links */}
+            <div className="hidden md:flex items-center gap-8">
               <a
                 href="#features"
-                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors"
+                className="text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-300"
               >
                 Features
               </a>
               <a
                 href="#how-it-works"
-                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors"
+                className="text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-300"
               >
                 How it Works
               </a>
               <a
                 href="#about"
-                className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors"
+                className="text-sm font-medium text-ink-muted hover:text-ink transition-colors duration-300"
               >
                 About
               </a>
             </div>
+
+            {/* CTA Button - Primary (Solid Black per design system) */}
             <button
               onClick={() => onNavigate(AppMode.CHAT)}
-              className="bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-semibold hover:bg-slate-800 transition-all transform hover:-translate-y-0.5 shadow-sm"
+              className="bg-ink text-white px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-slate-800 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5"
             >
               Launch App
             </button>
@@ -53,564 +118,462 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-slate-900 pt-16 pb-24 lg:pt-24 lg:pb-32">
-        {/* Abstract Background Shapes - Toned Down */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-          <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-brand-600/10 blur-[100px] animate-pulse"></div>
-          <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full bg-violet-600/10 blur-[100px] animate-float"></div>
+      {/* ========================================
+          HERO SECTION - Cinematic & Immersive
+          ======================================== */}
+      <section className="relative bg-ink overflow-hidden">
+        {/* Atmospheric Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {/* Soft gradient orbs */}
+          <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/5 blur-[120px] animate-pulse-slow"></div>
+          <div className="absolute top-1/4 -right-1/4 w-[50%] h-[50%] rounded-full bg-indigo-400/5 blur-[100px] animate-float"></div>
+          <div className="absolute -bottom-1/4 left-1/3 w-[40%] h-[40%] rounded-full bg-violet-500/5 blur-[80px] animate-float-delayed"></div>
+          
+          {/* Subtle grid pattern */}
+          <div 
+            className="absolute inset-0 opacity-[0.02]"
+            style={{
+              backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+              backgroundSize: '60px 60px'
+            }}
+          ></div>
+
+          {/* Large Decorative Text - Hero Background */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none select-none overflow-hidden w-full">
+            <span className="font-display text-[18vw] font-bold uppercase tracking-tighter text-white/[0.03] whitespace-nowrap block scale-110 opacity-70">
+              ZOTONGUE
+            </span>
+          </div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center">
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-32 lg:pt-32 lg:pb-40">
+          <div className="flex flex-col lg:flex-row items-center gap-16">
           {/* Text Content */}
-          <div className="w-full lg:w-1/2 text-center lg:text-left z-10">
-            {/* <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700 text-brand-300 text-[10px] font-semibold tracking-wide uppercase mb-6 backdrop-blur-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse"></span>
-              Powered by Gemini 3.0 Pro
-            </div> */}
-            <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.1] mb-5">
-              Master Languages, <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-violet-400">
-                Effortlessly.
-              </span>
-            </h1>
-            <p className="mt-4 text-base lg:text-lg text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
+            <div className={`w-full lg:w-1/2 text-center lg:text-left transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              {/* Main Headline - Large, Bold, Swiss Style */}
+              <h1 
+                className="font-display text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.75] uppercase text-white mb-8 mix-blend-overlay"
+                style={staggerDelay(1)}
+              >
+                Master<br />
+                <span className="text-transparent stroke-text">Languages</span><br />
+                Effortlessly
+              </h1>
+
+              {/* Subtitle - Adjusted for Swiss Grid alignment */}
+              <p 
+                className="text-lg lg:text-xl text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-12 border-l border-slate-800 pl-6 text-left"
+                style={staggerDelay(2)}
+              >
               The most advanced AI platform for the Zo language family.
-              Seamlessly bridge English with Paite, Thadou, Hmar, Mizo, and
-              more.
+                Seamlessly bridge English with Paite, Thadou, Hmar, Mizo, and more.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row justify-center lg:justify-start gap-3">
+
+              {/* CTA Buttons */}
+              <div 
+                className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4"
+                style={staggerDelay(3)}
+              >
               <button
                 onClick={() => onNavigate(AppMode.CHAT)}
-                className="px-6 py-3 bg-brand-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-brand-600/20 hover:bg-brand-500 transition-all transform hover:-translate-y-0.5"
+                  className="group px-8 py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
               >
                 Start Chatting
+                  <svg className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
               </button>
               <button
                 onClick={() => onNavigate(AppMode.SOLVER)}
-                className="group px-6 py-3 bg-white/5 backdrop-blur-sm text-white border border-white/10 rounded-xl font-semibold text-sm hover:bg-white/10 transition-all flex items-center justify-center"
+                  className="group px-8 py-4 bg-white/5 backdrop-blur-sm text-white border border-white/10 rounded-full font-semibold text-sm hover:bg-white/10 transition-all duration-300 flex items-center justify-center gap-2"
               >
-                <svg
-                  className="w-4 h-4 mr-2 text-violet-400 group-hover:text-violet-300"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                  />
+                  <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Visual Solver
               </button>
             </div>
           </div>
 
-          {/* 3D Graphic */}
-          <div className="hidden lg:flex w-1/2 items-center justify-center relative h-[400px] perspective-1000">
-            {/* CSS 3D Cube Construction */}
-            <div className="relative w-64 h-64 transform-style-3d animate-rotate-3d">
-              {/* Front */}
+            {/* 3D Graphic Element - Refined for Digital Swiss */}
+            <div className={`hidden lg:flex w-1/2 items-center justify-center relative h-[500px] perspective-1000 transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              {/* Floating Cube */}
+              <div className="relative w-80 h-80 transform-style-3d animate-rotate-3d">
+                {/* Front - Chat */}
               <div
-                className="absolute inset-0 bg-gradient-to-tr from-brand-600/10 to-brand-400/10 border border-brand-400/20 backdrop-blur-sm rounded-2xl transform translate-z-[128px]"
-                style={{ transform: "translateZ(128px)" }}
+                  className="absolute inset-0 bg-slate-900 border border-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  style={{ transform: "translateZ(160px)", backfaceVisibility: "hidden" }}
               >
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-6xl filter drop-shadow-lg opacity-90">
-                    💬
-                  </span>
+                  <svg className="w-24 h-24 text-white stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3.75h9m-9 3.75h9m1.8-11.25a3 3 0 11-6 0 3 3 0 016 0z" />
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 20.25v-14.25a3 3 0 013-3h12a3 3 0 013 3v14.25a3 3 0 01-3 3H6a3 3 0 01-3-3z" />
+                  </svg>
                 </div>
-              </div>
-              {/* Back */}
+                {/* Back - Translate */}
               <div
-                className="absolute inset-0 bg-gradient-to-tr from-violet-600/10 to-violet-400/10 border border-violet-400/20 backdrop-blur-sm rounded-2xl transform translate-z-[-128px] rotate-y-180"
-                style={{ transform: "translateZ(-128px) rotateY(180deg)" }}
+                  className="absolute inset-0 bg-white border border-slate-200/20 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  style={{ transform: "rotateY(180deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-6xl filter drop-shadow-lg opacity-90">
-                    🔄
-                  </span>
+                   <svg className="w-24 h-24 text-slate-900 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
+                  </svg>
                 </div>
-              </div>
-              {/* Right */}
+                {/* Right - Study */}
               <div
-                className="absolute inset-0 bg-gradient-to-tr from-emerald-600/10 to-emerald-400/10 border border-emerald-400/20 backdrop-blur-sm rounded-2xl transform rotate-y-90 translate-z-[128px]"
-                style={{ transform: "rotateY(90deg) translateZ(128px)" }}
+                  className="absolute inset-0 bg-slate-800 border border-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  style={{ transform: "rotateY(90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-6xl filter drop-shadow-lg opacity-90">
-                    🎓
-                  </span>
+                  <svg className="w-24 h-24 text-emerald-400 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                  </svg>
                 </div>
-              </div>
-              {/* Left */}
+                {/* Left - Solver */}
               <div
-                className="absolute inset-0 bg-gradient-to-tr from-sky-600/10 to-sky-400/10 border border-sky-400/20 backdrop-blur-sm rounded-2xl transform rotate-y-[-90deg] translate-z-[128px]"
-                style={{ transform: "rotateY(-90deg) translateZ(128px)" }}
+                  className="absolute inset-0 bg-slate-50 border border-slate-200 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  style={{ transform: "rotateY(-90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-6xl filter drop-shadow-lg opacity-90">
-                    📸
-                  </span>
+                   <svg className="w-24 h-24 text-indigo-600 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                  </svg>
                 </div>
-              </div>
-              {/* Top */}
+                {/* Top - Decorative */}
               <div
-                className="absolute inset-0 bg-white/5 border border-white/5 backdrop-blur-sm rounded-2xl transform rotate-x-90 translate-z-[128px]"
-                style={{ transform: "rotateX(90deg) translateZ(128px)" }}
+                  className="absolute inset-0 bg-slate-900 border border-white/10 rounded-3xl flex items-center justify-center backface-hidden"
+                  style={{ transform: "rotateX(90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               ></div>
-              {/* Bottom */}
+                {/* Bottom - Decorative */}
               <div
-                className="absolute inset-0 bg-white/5 border border-white/5 backdrop-blur-sm rounded-2xl transform rotate-x-[-90deg] translate-z-[128px]"
-                style={{ transform: "rotateX(-90deg) translateZ(128px)" }}
+                  className="absolute inset-0 bg-slate-900 border border-white/10 rounded-3xl flex items-center justify-center backface-hidden"
+                  style={{ transform: "rotateX(-90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               ></div>
             </div>
 
-            {/* Orbiting Elements */}
-            <div className="absolute w-[380px] h-[380px] border border-dashed border-brand-500/10 rounded-full animate-spin-slow"></div>
-            <div className="absolute w-[500px] h-[500px] border border-dashed border-violet-500/10 rounded-full animate-spin-reverse-slow"></div>
+              {/* Minimal Orbiting Elements */}
+              <div className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"></div>
+              <div className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Features Grid */}
-      <div id="features" className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-brand-600 font-bold tracking-widest uppercase text-[10px] mb-2 block">
+        {/* Curved Bottom Edge - Organic Connection */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-canvas rounded-t-[4rem]"></div>
+      </section>
+
+      {/* ========================================
+          FEATURES SECTION - Magazine Grid
+          ======================================== */}
+      <section id="features" className="py-32 bg-canvas">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          {/* Section Header - Aligned Left for Editorial Feel */}
+          <div className="max-w-2xl mb-24">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="h-px w-12 bg-accent"></div>
+              <span className="font-mono text-xs uppercase tracking-[0.2em] text-accent">
               Our Suite
             </span>
-            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-4">
-              Tools designed for connection.
+            </div>
+            <h2 className="font-display text-6xl md:text-7xl font-bold text-ink tracking-tighter leading-[0.9] mb-8">
+              Tools for<br />Connection
             </h2>
-            <p className="text-slate-600 text-base">
-              Everything you need to understand, learn, and communicate in
-              Kuki-Chin-Mizo languages.
+            <p className="text-xl text-ink-muted font-light leading-relaxed max-w-xl border-l border-slate-200 pl-6">
+              Everything you need to understand, learn, and communicate in Kuki-Chin-Mizo languages.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {/* Feature 1 */}
+          {/* Features Grid - Asymmetric Magazine Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+            {/* Primary Feature - Chat */}
             <div
               onClick={() => onNavigate(AppMode.CHAT)}
-              className="group bg-white rounded-xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_20px_rgba(0,0,0,0.05)] border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col hover:-translate-y-1"
+              className="lg:col-span-7 group relative bg-white rounded-[2.5rem] p-10 lg:p-16 overflow-hidden border border-slate-100 shadow-card hover:shadow-2xl transition-all duration-700 ease-out-expo cursor-pointer h-[500px] flex flex-col justify-between"
             >
-              <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center mb-4 group-hover:bg-brand-600 group-hover:text-white transition-colors">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
+              <div className="relative z-10">
+                <span className="inline-block px-4 py-1.5 rounded-full bg-slate-50 border border-slate-100 text-xs font-mono uppercase tracking-widest text-slate-500 mb-6 group-hover:bg-ink group-hover:text-white transition-colors duration-500">
+                  Flagship
+                </span>
+                <h3 className="font-display text-4xl lg:text-5xl font-bold text-ink mb-6 leading-tight group-hover:translate-x-2 transition-transform duration-500">
+                  Native Chat<span className="text-accent">.</span>
+                </h3>
+                <p className="text-lg text-slate-500 font-light leading-relaxed max-w-md group-hover:text-slate-600 transition-colors">
+                  Fluent, nuance-aware conversation in Paite, Thadou, Hmar, Mizo, and more.
+                </p>
               </div>
-              <h4 className="text-base font-bold text-slate-900 mb-2">
-                Native Chat
-              </h4>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4 flex-grow">
-                Fluent conversation in Paite, Thadou, Hmar, Mizo, and more.
-              </p>
-              <div className="flex items-center text-brand-600 text-xs font-bold uppercase tracking-wide">
-                Try Chat{" "}
-                <svg
-                  className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
-                  />
-                </svg>
+              
+              {/* Visual Decoration */}
+              <div className="absolute bottom-0 right-0 w-3/4 h-3/4 bg-gradient-to-tl from-slate-50 to-transparent rounded-tl-[100%] opacity-50 group-hover:scale-110 transition-transform duration-700 ease-out-expo pointer-events-none"></div>
+              <div className="absolute -bottom-10 -right-10 w-64 h-64 text-slate-100 group-hover:text-slate-200 transition-colors duration-500">
+                 {tools[0].icon}
+              </div>
+
+              {/* Action */}
+              <div className="relative z-10 flex items-center gap-3 text-ink font-bold text-sm uppercase tracking-wider group-hover:gap-5 transition-all duration-500">
+                Start Chatting
+                <div className="w-8 h-px bg-ink group-hover:w-16 transition-all duration-500"></div>
               </div>
             </div>
 
-            {/* Feature 2 */}
+            {/* Secondary Column */}
+            <div className="lg:col-span-5 flex flex-col gap-8">
+               {/* Translate Feature */}
             <div
               onClick={() => onNavigate(AppMode.TRANSLATE)}
-              className="group bg-white rounded-xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_20px_rgba(0,0,0,0.05)] border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col hover:-translate-y-1"
+                 className="group flex-1 bg-slate-900 rounded-[2.5rem] p-10 border border-slate-800 shadow-card hover:shadow-2xl transition-all duration-500 ease-out-expo cursor-pointer relative overflow-hidden"
             >
-              <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-                  />
-                </svg>
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 blur-[50px] rounded-full group-hover:bg-accent/20 transition-colors duration-500"></div>
+                 
+                 <div className="relative z-10 h-full flex flex-col justify-center">
+                   <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform duration-500">
+                      {tools[1].icon}
               </div>
-              <h4 className="text-base font-bold text-slate-900 mb-2">
-                Deep Translate
-              </h4>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4 flex-grow">
-                High-accuracy bidirectional translation between English and
-                local dialects.
-              </p>
-              <div className="flex items-center text-indigo-600 text-xs font-bold uppercase tracking-wide">
-                Translate{" "}
-                <svg
-                  className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
-                  />
-                </svg>
+                   <h3 className="font-display text-3xl font-bold text-white mb-3">Deep Translate</h3>
+                   <p className="text-slate-400 text-sm leading-relaxed mb-6">Bidirectional accuracy for local dialects.</p>
+                   <span className="text-white text-xs font-mono uppercase tracking-widest border-b border-white/20 pb-1 inline-block group-hover:border-white transition-colors">Try Now</span>
               </div>
             </div>
 
-            {/* Feature 3 */}
+               {/* Study Feature */}
             <div
               onClick={() => onNavigate(AppMode.STUDY)}
-              className="group bg-white rounded-xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_20px_rgba(0,0,0,0.05)] border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col hover:-translate-y-1"
-            >
-              <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                  />
-                </svg>
+                 className="group flex-1 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-card hover:shadow-2xl transition-all duration-500 ease-out-expo cursor-pointer relative overflow-hidden"
+               >
+                 <div className="relative z-10 h-full flex flex-col justify-center">
+                   <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500">
+                      {tools[2].icon}
+                   </div>
+                   <h3 className="font-display text-3xl font-bold text-ink mb-3">Study Companion</h3>
+                   <p className="text-slate-500 text-sm leading-relaxed mb-6">Instant summaries & AI quizzes.</p>
+                   <span className="text-ink text-xs font-mono uppercase tracking-widest border-b border-slate-200 pb-1 inline-block group-hover:border-ink transition-colors">Learn More</span>
               </div>
-              <h4 className="text-base font-bold text-slate-900 mb-2">
-                Study Companion
-              </h4>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4 flex-grow">
-                Paste any text to get instant summaries and generated quiz
-                questions.
-              </p>
-              <div className="flex items-center text-emerald-600 text-xs font-bold uppercase tracking-wide">
-                Start Learning{" "}
-                <svg
-                  className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
-                  />
-                </svg>
               </div>
             </div>
 
-            {/* Feature 4 */}
+            {/* Bottom Full Width - Solver */}
             <div
               onClick={() => onNavigate(AppMode.SOLVER)}
-              className="group bg-white rounded-xl p-6 shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_10px_20px_rgba(0,0,0,0.05)] border border-slate-100 transition-all duration-300 cursor-pointer flex flex-col hover:-translate-y-1"
+              className="lg:col-span-12 group relative bg-slate-50 rounded-[2.5rem] p-10 lg:p-14 border border-slate-200 overflow-hidden cursor-pointer hover:bg-white hover:shadow-2xl transition-all duration-700 ease-out-expo flex flex-col md:flex-row items-center gap-10"
             >
-              <div className="w-10 h-10 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center mb-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
+               <div className="md:w-1/2 relative z-10">
+                  <span className="text-accent font-mono text-xs uppercase tracking-widest mb-4 block">Visual Intelligence</span>
+                  <h3 className="font-display text-4xl font-bold text-ink mb-4">Smart Solver</h3>
+                  <p className="text-slate-500 text-lg leading-relaxed max-w-md mb-8">
+                    Stuck on a problem? Snap a photo and get detailed step-by-step solutions instantly.
+                  </p>
+                  <button className="bg-ink text-white px-8 py-3 rounded-full text-sm font-semibold group-hover:bg-accent transition-colors duration-300">
+                    Open Camera
+                  </button>
+               </div>
+               <div className="md:w-1/2 flex justify-center relative">
+                  {/* Abstract Camera Graphic */}
+                  <div className="w-64 h-64 relative">
+                     <div className="absolute inset-0 border-2 border-slate-200 rounded-full animate-spin-slow"></div>
+                     <div className="absolute inset-4 border border-slate-300 rounded-full animate-spin-reverse-slow opacity-50"></div>
+                     <div className="absolute inset-0 flex items-center justify-center text-slate-300 group-hover:text-accent transition-colors duration-500 transform group-hover:scale-110">
+                        {React.cloneElement(tools[3].icon as React.ReactElement, { className: "w-24 h-24" })}
+                     </div>
               </div>
-              <h4 className="text-base font-bold text-slate-900 mb-2">
-                Smart Solver
-              </h4>
-              <p className="text-slate-500 text-sm leading-relaxed mb-4 flex-grow">
-                Stuck on a problem? Snap a photo and get detailed step-by-step
-                help.
-              </p>
-              <div className="flex items-center text-violet-600 text-xs font-bold uppercase tracking-wide">
-                Solve Now{" "}
-                <svg
-                  className="w-3 h-3 ml-1 transition-transform group-hover:translate-x-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 8l4 4m0 0l-4 4m4-4H3"
-                  />
-                </svg>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* How It Works Section */}
-      <div
-        id="how-it-works"
-        className="py-16 bg-white border-t border-slate-100"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold text-slate-900">How it works</h2>
-            <p className="text-slate-500 mt-2 text-sm">
-              Three simple steps to bridge the gap.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative">
-            {/* Connecting Line for Desktop */}
-            <div className="hidden md:block absolute top-10 left-[16%] right-[16%] h-0.5 bg-slate-100 -z-10"></div>
+      {/* ========================================
+          HOW IT WORKS SECTION - Swiss Connector
+          ======================================== */}
+      <section id="how-it-works" className="py-32 bg-surface border-y border-slate-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            
+            {/* Left Content - Sticky Feel */}
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-3 mb-8">
+                 <span className="w-12 h-px bg-ink"></span>
+                 <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink">Workflow</span>
+              </div>
+              <h2 className="font-display text-6xl font-bold text-ink tracking-tighter leading-[0.95] mb-8">
+                Seamless<br />
+                Integration<span className="text-accent">.</span>
+              </h2>
+              <p className="text-xl text-slate-500 font-light leading-relaxed max-w-md mb-12">
+                Designed for instant utility. No complex setups, just pure linguistic power at your fingertips.
+              </p>
+              <button 
+                onClick={() => onNavigate(AppMode.CHAT)}
+                className="group bg-slate-50 border border-slate-200 text-ink px-8 py-4 rounded-full font-semibold text-sm hover:bg-ink hover:text-white hover:border-ink transition-all duration-300 flex items-center gap-2"
+              >
+                Try it Now
+                <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
+              </button>
+            </div>
 
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto bg-white border-4 border-slate-50 rounded-full flex items-center justify-center mb-5 shadow-sm relative z-10">
-                <span className="text-xl font-bold text-brand-500">1</span>
+            {/* Right - Vertical Timeline Cards */}
+            <div className="relative space-y-6">
+               {/* Connecting Line */}
+               <div className="absolute left-8 top-8 bottom-8 w-px bg-slate-100 z-0"></div>
+
+               {[
+                 { num: "01", title: "Select Tool", desc: "Choose Chat, Translate, Study, or Solver." },
+                 { num: "02", title: "Input Content", desc: "Type text, speak, or upload an image." },
+                 { num: "03", title: "Instant Results", desc: "Get AI-powered insights in seconds." },
+               ].map((step, i) => (
+                 <div key={i} className="relative z-10 group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-card-hover hover:border-slate-200 hover:-translate-x-2 transition-all duration-500 cursor-default flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:bg-ink group-hover:border-ink transition-colors duration-500">
+                       <span className="font-display font-bold text-xl text-slate-400 group-hover:text-white transition-colors duration-500">{step.num}</span>
               </div>
-              <h3 className="font-bold text-base mb-2">Choose your Tool</h3>
-              <p className="text-slate-500 text-sm px-4">
-                Select Chat, Translate, Study, or Solve from our dashboard.
-              </p>
+                    <div>
+                       <h3 className="font-display text-xl font-bold text-ink mb-1">{step.title}</h3>
+                       <p className="text-slate-500 text-sm font-light">{step.desc}</p>
             </div>
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto bg-white border-4 border-slate-50 rounded-full flex items-center justify-center mb-5 shadow-sm relative z-10">
-                <span className="text-xl font-bold text-brand-500">2</span>
               </div>
-              <h3 className="font-bold text-base mb-2">Select Language</h3>
-              <p className="text-slate-500 text-sm px-4">
-                Pick between Paite, Thadou, Hmar, and more.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-20 h-20 mx-auto bg-white border-4 border-slate-50 rounded-full flex items-center justify-center mb-5 shadow-sm relative z-10">
-                <span className="text-xl font-bold text-brand-500">3</span>
-              </div>
-              <h3 className="font-bold text-base mb-2">Get Instant Results</h3>
-              <p className="text-slate-500 text-sm px-4">
-                Let Gemini 3 Pro analyze and respond in real-time.
-              </p>
+               ))}
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ========================================
+          ABOUT SECTION - Minimalist Editorial
+          ======================================== */}
+      <section id="about" className="py-40 bg-canvas relative">
+        <div className="max-w-5xl mx-auto px-6 lg:px-8 text-center">
+          <div className="inline-block mb-12">
+             <span className="font-mono text-xs uppercase tracking-[0.3em] text-slate-400 border-b border-slate-200 pb-2">Our Mission</span>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-slate-950 border-t border-slate-900 py-12 mt-auto text-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+          <h2 className="font-display text-5xl md:text-7xl font-bold text-ink tracking-tight mb-12 leading-[1.1]">
+            "Preserving heritage through the lens of <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-emerald-500">modern intelligence</span>."
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-left border-t border-slate-200 pt-12">
+             <div>
+                <h4 className="font-bold text-ink mb-4">Community First</h4>
+                <p className="text-slate-500 text-sm leading-relaxed">Built specifically for Kuki-Chin-Mizo dialects, ensuring cultural nuance is never lost in translation.</p>
+             </div>
+             <div>
+                <h4 className="font-bold text-ink mb-4">Future Ready</h4>
+                <p className="text-slate-500 text-sm leading-relaxed">Powered by Gemini 3.0 Pro, delivering state-of-the-art reasoning and multimodal capabilities.</p>
+             </div>
+             <div>
+                <h4 className="font-bold text-ink mb-4">Education Focused</h4>
+                <p className="text-slate-500 text-sm leading-relaxed">Tools designed not just to solve problems, but to explain the 'why' and 'how' behind them.</p>
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================
+          FOOTER - Magazine Poster Style
+          ======================================== */}
+      <footer className="bg-ink border-t border-slate-800 pt-20 pb-12 mt-auto relative overflow-hidden">
+        {/* Large Decorative Text */}
+        <div className="absolute -bottom-16 left-0 right-0 text-center pointer-events-none select-none overflow-hidden">
+          <span className="font-display text-[20vw] font-bold uppercase tracking-tighter text-white/[0.02] whitespace-nowrap">
+            ZOTONGUE
+          </span>
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8">
+          {/* Footer Grid - 4 Columns */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mb-16">
             {/* Brand Column */}
-            <div className="col-span-1 md:col-span-1">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-7 h-7 bg-gradient-to-br from-brand-600 to-brand-500 rounded-lg flex items-center justify-center text-white font-bold text-base">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2.5 mb-6">
+                <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-ink font-display font-bold text-lg">
                   Z
                 </div>
-                <span className="text-base font-bold text-white tracking-tight">
-                  ZoTongue<span className="text-brand-500">AI</span>
+                <span className="font-display text-lg font-bold text-white tracking-tight">
+                  ZoTongue<span className="text-accent">AI</span>
                 </span>
               </div>
-              <p className="text-slate-400 leading-relaxed mb-6 text-xs">
-                Empowering the Kuki-Chin-Mizo communities with cutting-edge
-                artificial intelligence to preserve language and foster
-                education.
+              <p className="text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
+                Empowering the Kuki-Chin-Mizo communities with cutting-edge AI 
+                to preserve language and foster education.
               </p>
-              <div className="flex space-x-4">
-                <a
-                  href="#"
-                  className="text-slate-500 hover:text-white transition-colors"
-                >
-                  <span className="sr-only">Twitter</span>
-                  <svg
-                    className="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+              {/* Social Icons */}
+              <div className="flex gap-4">
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-300">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8.29 20.251c7.547 0 11.675-6.253 11.675-11.675 0-.178 0-.355-.012-.53A8.348 8.348 0 0022 5.92a8.19 8.19 0 01-2.357.646 4.118 4.118 0 001.804-2.27 8.224 8.224 0 01-2.605.996 4.107 4.107 0 00-6.993 3.743 11.65 11.65 0 01-8.457-4.287 4.106 4.106 0 001.27 5.477A4.072 4.072 0 012.8 9.713v.052a4.105 4.105 0 003.292 4.022 4.095 4.095 0 01-1.853.07 4.108 4.108 0 003.834 2.85A8.233 8.233 0 012 18.407a11.616 11.616 0 006.29 1.84" />
                   </svg>
                 </a>
-                <a
-                  href="#"
-                  className="text-slate-500 hover:text-white transition-colors"
-                >
-                  <span className="sr-only">GitHub</span>
-                  <svg
-                    className="w-5 h-5"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                      clipRule="evenodd"
-                    />
+                <a href="#" className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-300">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
                   </svg>
                 </a>
               </div>
             </div>
 
-            {/* Links Columns */}
+            {/* Platform Links */}
             <div>
-              <h3 className="text-white font-semibold mb-3 uppercase tracking-wider text-[10px]">
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-6">
                 Platform
-              </h3>
-              <ul className="space-y-2">
-                <li>
+              </h4>
+              <ul className="space-y-4">
+                {[
+                  { label: "Native Chat", mode: AppMode.CHAT },
+                  { label: "Translator", mode: AppMode.TRANSLATE },
+                  { label: "Study Companion", mode: AppMode.STUDY },
+                  { label: "Visual Solver", mode: AppMode.SOLVER },
+                ].map((item) => (
+                  <li key={item.mode}>
                   <button
-                    onClick={() => onNavigate(AppMode.CHAT)}
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
+                      onClick={() => onNavigate(item.mode)}
+                      className="text-slate-400 hover:text-white transition-colors duration-300 text-sm"
                   >
-                    Native Chat
+                      {item.label}
                   </button>
                 </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppMode.TRANSLATE)}
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Translator
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppMode.STUDY)}
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Study Companion
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppMode.SOLVER)}
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Visual Solver
-                  </button>
-                </li>
+                ))}
               </ul>
             </div>
 
+            {/* Resources Links */}
             <div>
-              <h3 className="text-white font-semibold mb-3 uppercase tracking-wider text-[10px]">
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-6">
                 Resources
-              </h3>
-              <ul className="space-y-2">
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Documentation
+              </h4>
+              <ul className="space-y-4">
+                {["Documentation", "Language Support", "Community Forum", "Blog"].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="text-slate-400 hover:text-white transition-colors duration-300 text-sm">
+                      {item}
                   </a>
                 </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Language Support
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Community Forum
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Blog
-                  </a>
-                </li>
+                ))}
               </ul>
             </div>
 
+            {/* Company Links */}
             <div>
-              <h3 className="text-white font-semibold mb-3 uppercase tracking-wider text-[10px]">
+              <h4 className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-6">
                 Company
-              </h3>
-              <ul className="space-y-2">
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    About Us
+              </h4>
+              <ul className="space-y-4">
+                {["About Us", "Careers", "Legal", "Contact"].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="text-slate-400 hover:text-white transition-colors duration-300 text-sm">
+                      {item}
                   </a>
                 </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Careers
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Legal
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#"
-                    className="text-slate-400 hover:text-brand-400 transition-colors"
-                  >
-                    Contact
-                  </a>
-                </li>
+                ))}
               </ul>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-slate-900 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-slate-500 text-xs">
+          {/* Bottom Bar */}
+          <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-slate-500 text-sm">
               © 2024 ZoTongue AI. All rights reserved.
             </p>
-            <div className="flex gap-6 text-slate-500 text-xs">
-              <a href="#" className="hover:text-white">
+            <div className="flex gap-8 text-sm">
+              <a href="#" className="text-slate-500 hover:text-white transition-colors duration-300">
                 Privacy Policy
               </a>
-              <a href="#" className="hover:text-white">
+              <a href="#" className="text-slate-500 hover:text-white transition-colors duration-300">
                 Terms of Service
               </a>
             </div>

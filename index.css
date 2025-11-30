@@ -2,45 +2,178 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 3D Animation Utilities */
+/* ========================================
+   DIGITAL SWISS EDITORIAL DESIGN SYSTEM
+   ======================================== */
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  /* Stroke Text Effect for large decorative typography */
+  .stroke-text {
+    -webkit-text-stroke: 1px currentColor;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .stroke-text-2 {
+    -webkit-text-stroke: 2px currentColor;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Stagger animation delays */
+  .stagger-1 { animation-delay: 100ms; }
+  .stagger-2 { animation-delay: 200ms; }
+  .stagger-3 { animation-delay: 300ms; }
+  .stagger-4 { animation-delay: 400ms; }
+  .stagger-5 { animation-delay: 500ms; }
+  .stagger-6 { animation-delay: 600ms; }
+
+  /* Hide scrollbar utilities */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Custom scrollbar for modern look */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  /* Text balance for headings */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ========================================
+   ANIMATION UTILITIES
+   ======================================== */
+
+/* Lazy & Smooth Enter Animation */
+.animate-enter {
+  animation: enterFromBelow 0.8s ease-out forwards;
+}
+
+@keyframes enterFromBelow {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade in animation */
+.animate-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide in from bottom */
+.slide-in-from-bottom-4 {
+  animation: slideInFromBottom 0.6s ease-out forwards;
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   3D CUBE ANIMATION (for Hero)
+   ======================================== */
+
 .perspective-1000 {
   perspective: 1000px;
 }
+
 .transform-style-3d {
   transform-style: preserve-3d;
+  will-change: transform;
 }
+
 .animate-rotate-3d {
   animation: rotate3d 30s linear infinite;
 }
+
 @keyframes rotate3d {
   0% {
-    transform: rotateX(0deg) rotateY(0deg);
+    transform: rotate3d(1, 1, 1, 0deg);
   }
   100% {
-    transform: rotateX(360deg) rotateY(360deg);
+    transform: rotate3d(1, 1, 1, 360deg);
   }
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-/* Hide scrollbar for IE, Edge and Firefox */
-.no-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-}
+/* ========================================
+   MARKDOWN / PROSE OVERRIDES
+   ======================================== */
 
-/* Markdown Prose Overrides */
 .prose p {
   margin-top: 0.5em;
   margin-bottom: 0.5em;
 }
+
 .prose > :first-child {
   margin-top: 0;
 }
+
 .prose > :last-child {
   margin-bottom: 0;
+}
+
+.prose-invert a {
+  color: #a5b4fc;
+}
+
+/* ========================================
+   FORM ELEMENTS
+   ======================================== */
+
+/* Focus ring styling per design system */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent;
+}
+
+/* Input styling */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
 }
 
 /* Prevent character breaking in user chat messages */
@@ -48,4 +181,48 @@
   word-break: normal !important;
   overflow-wrap: normal !important;
   white-space: normal !important;
+}
+
+/* ========================================
+   BUTTON HOVER EFFECTS
+   ======================================== */
+
+.btn-primary {
+  @apply bg-ink text-white font-semibold transition-all duration-300;
+}
+
+.btn-primary:hover {
+  @apply bg-slate-800 shadow-lg;
+}
+
+.btn-secondary {
+  @apply bg-white border border-slate-200 text-ink font-medium transition-all duration-300;
+}
+
+.btn-secondary:hover {
+  @apply border-slate-300 shadow-md;
+}
+
+/* ========================================
+   CARD HOVER EFFECTS
+   ======================================== */
+
+.card-interactive {
+  @apply transition-all duration-500 ease-out-expo;
+}
+
+.card-interactive:hover {
+  @apply shadow-card-hover -translate-y-1;
+}
+
+/* ========================================
+   GRADIENT OVERLAYS
+   ======================================== */
+
+.gradient-overlay-dark {
+  background: linear-gradient(to bottom, rgba(15, 23, 42, 0.9), transparent);
+}
+
+.gradient-overlay-light {
+  background: linear-gradient(to bottom, rgba(248, 250, 252, 0.9), transparent);
 }

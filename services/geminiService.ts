@@ -28,7 +28,7 @@ export const createChatSession = (language: SupportedLanguage): Chat => {
       systemInstruction: systemInstruction,
       temperature: 0.4,
       thinkingConfig: {
-        thinkingLevel: ThinkingLevel.LOW, // Use low thinking level for faster responses
+        thinkingLevel: ThinkingLevel.HIGH, // Use high thinking level for better reasoning
       },
     },
   });

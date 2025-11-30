@@ -31,7 +31,6 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
       const base64Data = base64String.split(",")[1];
       setImage({
         data: base64Data,
@@ -65,7 +64,6 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    // Delay to allow click events to register
     setTimeout(() => {
       if (!textareaRef.current?.matches(":focus")) {
         setIsEditing(false);
@@ -85,32 +83,29 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     setIsEditing(true);
     setTimeout(() => {
       textareaRef.current?.focus();
-      // Move cursor to end
       if (textareaRef.current) {
         textareaRef.current.setSelectionRange(input.length, input.length);
       }
     }, 0);
   };
 
-  // Normalize LaTeX syntax: convert \( to $ and \[ to $$
+  // Normalize LaTeX syntax
   const normalizeMathSyntax = (text: string): string => {
-    // Replace \( with $ and \) with $
     let normalized = text.replace(/\\\(/g, "$").replace(/\\\)/g, "$");
-    // Replace \[ with $$ and \] with $$
     normalized = normalized.replace(/\\\[/g, "$$").replace(/\\\]/g, "$$");
     return normalized;
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 w-full">
+    <div className="flex flex-col h-full bg-canvas w-full">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center sticky top-0 z-20 shadow-[0_2px_10px_rgba(0,0,0,0.03)] shrink-0">
+      <header className="bg-surface border-b border-slate-100 px-5 py-4 flex items-center sticky top-0 z-20 shrink-0">
         <button
           onClick={onBack}
-          className="p-2 -ml-2 mr-2 rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          className="p-2.5 -ml-2 mr-3 rounded-xl text-ink-muted hover:text-ink hover:bg-slate-50 transition-all duration-300"
         >
           <svg
-            className="w-6 h-6"
+            className="w-5 h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -123,36 +118,37 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
             />
           </svg>
         </button>
-        <h2 className="text-lg font-bold text-slate-800">Smart Solver</h2>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 pb-28 space-y-5">
-        {/* Controls */}
-        <div className="flex justify-end">
-          <div className="w-48">
-            <LanguageSelector
-              selected={targetLang}
-              onChange={setTargetLang}
-              label="Answer Language"
-            />
-          </div>
+        <div className="flex-1">
+          <h2 className="font-display text-lg font-bold text-ink">Smart Solver</h2>
+          <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
+            Visual Problem Solving
+          </p>
         </div>
+        <div className="w-44">
+          <LanguageSelector
+            selected={targetLang}
+            onChange={setTargetLang}
+            label="Answer Language"
+          />
+        </div>
+      </header>
 
+      <div className="flex-1 overflow-y-auto p-5 pb-28 space-y-5 custom-scrollbar">
         {/* Image Input Area */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="space-y-3">
+          <label className="block font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">
             Problem Image (Optional)
           </label>
           <div
             onClick={() => fileInputRef.current?.click()}
             className={`
-                    relative w-full h-48 rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden flex flex-col items-center justify-center
-                    ${
-                      image
-                        ? "border-violet-400 bg-slate-900"
-                        : "border-slate-300 bg-white hover:bg-slate-50 hover:border-violet-300"
-                    }
-                `}
+              relative w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden flex flex-col items-center justify-center
+              ${
+                image
+                  ? "border-accent bg-ink"
+                  : "border-slate-200 bg-surface hover:bg-slate-50 hover:border-accent/50"
+              }
+            `}
           >
             <input
               type="file"
@@ -168,10 +164,10 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
                 <img
                   src={`data:${image.mime};base64,${image.data}`}
                   alt="Preview"
-                  className="h-full w-full object-contain opacity-80"
+                  className="h-full w-full object-contain opacity-90"
                 />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors">
-                  <div className="bg-white/20 backdrop-blur-md p-2 rounded-full">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors duration-300">
+                  <div className="bg-white/20 backdrop-blur-md p-3 rounded-2xl">
                     <svg
                       className="w-6 h-6 text-white"
                       fill="none"
@@ -189,10 +185,10 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
                 </div>
               </>
             ) : (
-              <div className="text-center p-4">
-                <div className="w-12 h-12 bg-violet-50 text-violet-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className="text-center p-6">
+                <div className="w-14 h-14 bg-accent-light text-accent rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <svg
-                    className="w-6 h-6"
+                    className="w-7 h-7"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -200,21 +196,21 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2}
+                      strokeWidth={1.5}
                       d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
                     />
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      strokeWidth={2}
+                      strokeWidth={1.5}
                       d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                     />
                   </svg>
                 </div>
-                <p className="text-slate-600 font-medium text-sm">
+                <p className="text-ink font-medium text-sm mb-1">
                   Tap to take photo or upload
                 </p>
-                <p className="text-slate-400 text-xs mt-1">
+                <p className="text-ink-muted text-xs">
                   Supports Math, MCQ, Diagrams
                 </p>
               </div>
@@ -223,35 +219,35 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
         </div>
 
         {/* Text Input */}
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="space-y-3">
+          <label className="block font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">
             Question / Context
           </label>
-          <div className="relative w-full min-h-[100px] bg-white rounded-xl border border-slate-200 focus-within:border-violet-500 focus-within:ring-1 focus-within:ring-violet-500 transition-all shadow-sm">
-            {/* Always show rendered markdown when there's content */}
+          <div className="relative w-full min-h-[120px] bg-surface rounded-2xl border border-slate-200 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20 transition-all duration-300 shadow-card">
+            {/* Rendered markdown view */}
             {input.trim() && (
               <div
                 ref={inputRef}
                 onClick={handleRenderedClick}
-                className={`p-4 text-sm text-slate-800 leading-relaxed min-h-[100px] ${
+                className={`p-5 text-[15px] text-ink leading-relaxed min-h-[120px] ${
                   isEditing ? "hidden" : "block cursor-text"
                 }`}
               >
                 <MarkdownRenderer
                   content={normalizeMathSyntax(input)}
-                  className="text-slate-800 prose-sm max-w-none"
+                  className="text-ink prose-sm max-w-none"
                 />
               </div>
             )}
-            {/* Textarea for editing - always present but hidden when showing rendered */}
+            {/* Textarea for editing */}
             <textarea
               ref={textareaRef}
               value={input}
               onChange={handleTextareaChange}
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              placeholder="Type your question here... Use $ for inline math (e.g., $x^2$) or $$ for block equations (e.g., $$E=mc^2$$)"
-              className={`w-full p-4 bg-white text-sm text-slate-800 placeholder-slate-400 leading-relaxed resize-none outline-none min-h-[100px] ${
+              placeholder="Type your question here... Use $ for inline math (e.g., $x^2$) or $$ for block equations"
+              className={`w-full p-5 bg-surface text-[15px] text-ink placeholder-ink-muted/50 leading-relaxed resize-none outline-none min-h-[120px] rounded-2xl ${
                 isEditing || !input.trim() ? "block" : "hidden"
               }`}
             />
@@ -260,34 +256,34 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
 
         {/* Result Area */}
         {result && (
-          <div className="bg-violet-50 border border-violet-100 rounded-2xl p-5 animate-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center gap-2 mb-3 text-violet-800 border-b border-violet-200/50 pb-2">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-              <h3 className="font-bold text-sm uppercase tracking-wide">
-                Solution
-              </h3>
+          <div className="bg-accent-light rounded-3xl shadow-card border border-accent/10 overflow-hidden animate-enter">
+            <div className="px-5 py-4 bg-accent/5 border-b border-accent/10 flex items-center gap-3">
+              <div className="w-8 h-8 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  />
+                </svg>
+              </div>
+              <h3 className="font-display font-bold text-accent text-sm">Solution</h3>
             </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="p-5 bg-surface">
               <MarkdownRenderer
                 content={result}
-                className="text-slate-800 prose-violet"
+                className="text-ink prose-indigo"
               />
             </div>
             {usage && (
-              <div className="mt-3 pt-3 border-t border-violet-200/50 text-xs text-violet-600 flex items-center gap-3">
-                <span>Tokens: {usage.candidatesTokenCount || 0} output</span>
+              <div className="px-5 py-4 border-t border-accent/10 bg-accent/5 font-mono text-[10px] text-accent/70 flex items-center gap-4">
+                <span>{usage.candidatesTokenCount || 0} output</span>
                 {usage.thoughtsTokenCount && usage.thoughtsTokenCount > 0 && (
                   <span>• {usage.thoughtsTokenCount} thoughts</span>
                 )}
@@ -301,16 +297,16 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
       </div>
 
       {/* Floating Action Button */}
-      <div className="p-4 bg-white border-t border-slate-200 shrink-0 md:bg-transparent md:border-none z-30">
+      <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-canvas via-canvas to-transparent pt-10 z-30">
         <button
           onClick={handleSolve}
           disabled={isLoading || (!input.trim() && !image)}
-          className="flex items-center justify-center w-full py-4 bg-violet-600 text-white rounded-xl shadow-lg shadow-violet-200 hover:bg-violet-700 disabled:opacity-50 disabled:bg-slate-400 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+          className="flex items-center justify-center w-full py-4 bg-accent text-white rounded-2xl shadow-lg shadow-accent/20 hover:bg-accent-hover disabled:opacity-40 disabled:bg-slate-300 transition-all duration-300 disabled:cursor-not-allowed font-semibold text-[15px]"
         >
           {isLoading ? (
-            <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
           ) : (
-            <span className="font-bold">Solve Problem</span>
+            'Solve Problem'
           )}
         </button>
       </div>

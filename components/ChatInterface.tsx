@@ -99,15 +99,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-50 w-full">
-      {/* App-like Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-4 flex items-center sticky top-0 z-20 shadow-[0_2px_10px_rgba(0,0,0,0.03)] shrink-0">
+    <div className="flex flex-col h-full bg-canvas w-full">
+      {/* Header - Clean & Minimal */}
+      <header className="bg-surface border-b border-slate-100 px-5 py-4 flex items-center sticky top-0 z-20 shrink-0">
         <button
           onClick={onBack}
-          className="p-2 -ml-2 mr-2 rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-200 transition-colors"
+          className="p-2.5 -ml-2 mr-3 rounded-xl text-ink-muted hover:text-ink hover:bg-slate-50 transition-all duration-300"
         >
           <svg
-            className="w-6 h-6"
+            className="w-5 h-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -121,10 +121,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
           </svg>
         </button>
         <div className="flex-1">
-          <h2 className="text-lg font-bold text-slate-900 leading-tight">
+          <h2 className="font-display text-lg font-bold text-ink leading-tight">
             Native Chat
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
             Speaking: {selectedLanguage}
           </p>
         </div>
@@ -134,27 +134,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
             onChange={setSelectedLanguage}
           />
         </div>
-      </div>
+      </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/50 scroll-smooth">
-        {messages.map((msg) => (
+      <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
+        {messages.map((msg, index) => (
           <div
             key={msg.id}
-            className={`flex w-full ${
+            className={`flex w-full animate-enter ${
               msg.role === "user" ? "justify-end" : "justify-start"
             }`}
+            style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div className="flex flex-col">
+            <div className="flex flex-col max-w-[85%]">
               <div
                 className={`
-                  max-w-[85%] px-5 py-3.5 rounded-2xl shadow-sm text-[15px] leading-relaxed
+                  px-5 py-4 text-[15px] leading-relaxed shadow-card
                   ${
                     msg.role === "user"
-                      ? "bg-brand-600 text-white rounded-br-sm user-message-text"
+                      ? "bg-ink text-white rounded-3xl rounded-br-lg user-message-text"
                       : msg.isError
-                      ? "bg-red-50 text-red-800 border border-red-100 rounded-bl-sm"
-                      : "bg-white text-slate-800 border border-slate-100 rounded-bl-sm"
+                      ? "bg-red-50 text-red-800 border border-red-100 rounded-3xl rounded-bl-lg"
+                      : "bg-surface text-ink border border-slate-100 rounded-3xl rounded-bl-lg"
                   }
                 `}
               >
@@ -163,18 +164,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
                 ) : (
                   <MarkdownRenderer
                     content={msg.text}
-                    className={msg.isError ? "text-red-800" : "text-slate-800"}
+                    className={msg.isError ? "text-red-800 prose-red" : ""}
                   />
                 )}
               </div>
               {msg.usage && msg.role === "model" && !msg.isError && (
-                <div className="mt-1 ml-1 text-xs text-slate-400 flex items-center gap-2">
-                  <span>
-                    Tokens: {msg.usage.candidatesTokenCount || 0} output
-                  </span>
+                <div className="mt-2 ml-2 font-mono text-[10px] text-ink-muted flex items-center gap-3">
+                  <span>{msg.usage.candidatesTokenCount || 0} output</span>
                   {msg.usage.thoughtsTokenCount &&
                     msg.usage.thoughtsTokenCount > 0 && (
-                      <span>• {msg.usage.thoughtsTokenCount} thoughts</span>
+                      <span className="text-accent">• {msg.usage.thoughtsTokenCount} thoughts</span>
                     )}
                   {msg.usage.totalTokenCount && (
                     <span>• {msg.usage.totalTokenCount} total</span>
@@ -184,45 +183,49 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
             </div>
           </div>
         ))}
+        
+        {/* Loading Indicator */}
         {isLoading && (
           <div className="flex justify-start w-full">
-            <div className="bg-white border border-slate-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm flex items-center space-x-1.5">
-              <div
-                className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              ></div>
-              <div
-                className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              ></div>
-              <div
-                className="w-1.5 h-1.5 bg-brand-400 rounded-full animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              ></div>
+            <div className="bg-surface border border-slate-100 px-5 py-4 rounded-3xl rounded-bl-lg shadow-card flex items-center gap-2">
+              <div className="flex gap-1.5">
+                <div
+                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                ></div>
+                <div
+                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                ></div>
+              </div>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 bg-white border-t border-slate-200 shrink-0">
+      {/* Input Area - Refined */}
+      <div className="p-5 bg-surface border-t border-slate-100 shrink-0">
         <form
           onSubmit={handleSendMessage}
-          className="relative flex items-center shadow-sm rounded-2xl bg-slate-50 border border-slate-200 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500 transition-all"
+          className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-accent/20 focus-within:border-accent transition-all duration-300"
         >
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={`Message in ${selectedLanguage}...`}
-            className="w-full pl-4 pr-12 py-3.5 bg-transparent border-none focus:ring-0 text-slate-800 placeholder-slate-400"
+            className="w-full pl-5 pr-14 py-4 bg-transparent border-none focus:ring-0 focus:outline-none text-ink placeholder-ink-muted text-[15px]"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
-            className="absolute right-2 p-2 bg-brand-600 text-white rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:bg-slate-300 transition-all"
+            className="absolute right-2 p-3 bg-ink text-white rounded-xl hover:bg-slate-800 disabled:opacity-40 disabled:bg-slate-300 transition-all duration-300 disabled:cursor-not-allowed"
           >
             <svg
               className="w-5 h-5"
@@ -233,7 +236,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onBack }) => {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2.5}
+                strokeWidth={2}
                 d="M5 12h14M12 5l7 7-7 7"
               />
             </svg>
