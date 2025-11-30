@@ -199,10 +199,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
             {/* 3D Graphic Element - Refined for Digital Swiss */}
             <div className={`hidden lg:flex w-1/2 items-center justify-center relative h-[500px] perspective-1000 transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               {/* Floating Cube */}
-              <div className="relative w-80 h-80 transform-style-3d animate-rotate-3d">
+              <div className="relative w-80 h-80 transform-style-3d animate-rotate-3d z-10">
                 {/* Front - Chat */}
               <div
-                  className="absolute inset-0 bg-slate-900 border border-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  className="absolute inset-0 bg-slate-900 border border-white/20 rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
                   style={{ transform: "translateZ(160px)", backfaceVisibility: "hidden" }}
               >
                   <svg className="w-24 h-24 text-white stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,7 +212,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 </div>
                 {/* Back - Translate */}
               <div
-                  className="absolute inset-0 bg-white border border-slate-200/20 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  className="absolute inset-0 bg-white border border-slate-200/20 rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
                   style={{ transform: "rotateY(180deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
                    <svg className="w-24 h-24 text-slate-900 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,7 +221,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 </div>
                 {/* Right - Study */}
               <div
-                  className="absolute inset-0 bg-slate-800 border border-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  className="absolute inset-0 bg-slate-800 border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
                   style={{ transform: "rotateY(90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
                   <svg className="w-24 h-24 text-emerald-400 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onNavigate }) => {
                 </div>
                 {/* Left - Solver */}
               <div
-                  className="absolute inset-0 bg-slate-50 border border-slate-200 backdrop-blur-md rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
+                  className="absolute inset-0 bg-slate-50 border border-slate-200 rounded-3xl flex items-center justify-center shadow-2xl backface-hidden"
                   style={{ transform: "rotateY(-90deg) translateZ(160px)", backfaceVisibility: "hidden" }}
               >
                    <svg className="w-24 h-24 text-indigo-600 stroke-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
