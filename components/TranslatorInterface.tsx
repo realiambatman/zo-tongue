@@ -25,6 +25,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const isCreatingSessionRef = useRef(false); // Prevent double creation
 
   // Guest ID logic
   const [guestId] = useState(() => {
@@ -40,9 +41,11 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     const initSession = async () => {
       if (authLoading) return;
       if (sessionId) return;
+      if (isCreatingSessionRef.current) return;
 
       const effectiveUserId = user?.uid || guestId;
       if (effectiveUserId) {
+        isCreatingSessionRef.current = true;
         try {
           const id = await createNewSession(
             effectiveUserId,
@@ -55,6 +58,7 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
           setSessionId(id);
         } catch (e) {
           console.error("Failed to create translation session", e);
+          isCreatingSessionRef.current = false;
         }
       }
     };
@@ -78,6 +82,17 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
     setUsage(null);
 
     try {
+      // Save User Input to DB immediately
+      const timestamp = Date.now();
+      if (sessionId) {
+        await addMessageToSession(sessionId, {
+          id: timestamp.toString(),
+          role: "user",
+          text: `[${sourceLang} -> ${targetLang}] ${input}`,
+          timestamp: timestamp,
+        });
+      }
+
       const result = await translateText(input, sourceLang, targetLang);
 
       if (result.text.startsWith("Error:")) {
@@ -86,18 +101,8 @@ const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
         setOutput(result.text);
         setUsage(result.usage);
 
-        // Save to DB
+        // Save Model Output to DB
         if (sessionId) {
-          const timestamp = Date.now();
-          // User message (Input)
-          await addMessageToSession(sessionId, {
-            id: timestamp.toString(),
-            role: "user",
-            text: `[${sourceLang} -> ${targetLang}] ${input}`,
-            timestamp: timestamp,
-          });
-
-          // Model message (Output)
           await addMessageToSession(sessionId, {
             id: (timestamp + 1).toString(),
             role: "model",

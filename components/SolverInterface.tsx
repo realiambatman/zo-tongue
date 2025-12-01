@@ -24,6 +24,7 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
   const [usage, setUsage] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const isCreatingSessionRef = useRef(false); // Prevent double creation
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,9 +43,11 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     const initSession = async () => {
       if (authLoading) return;
       if (sessionId) return;
+      if (isCreatingSessionRef.current) return; // Prevent double creation
 
       const effectiveUserId = user?.uid || guestId;
       if (effectiveUserId) {
+        isCreatingSessionRef.current = true;
         try {
           const id = await createNewSession(
             effectiveUserId,
@@ -57,6 +60,7 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
           setSessionId(id);
         } catch (e) {
           console.error("Failed to create solver session", e);
+          isCreatingSessionRef.current = false;
         }
       }
     };
@@ -87,6 +91,20 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     setUsage(null);
 
     try {
+      // Save User Input to DB immediately
+      let userMsgId = "";
+      const timestamp = Date.now();
+      if (sessionId) {
+        userMsgId = timestamp.toString();
+        await addMessageToSession(sessionId, {
+          id: userMsgId,
+          role: "user",
+          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
+          // image: image ? `data:${image.mime};base64,${image.data}` : undefined,
+          timestamp: timestamp,
+        });
+      }
+
       const response = await solveMultimodal(
         image?.data || null,
         image?.mime || null,
@@ -96,21 +114,8 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
       setResult(response.text);
       setUsage(response.usage);
 
-      // Save to DB
+      // Save Model Output to DB
       if (sessionId) {
-        const timestamp = Date.now();
-        // User Input
-        // NOTE: We do not save the full Base64 image to Firestore to avoid hitting the 1MB document limit.
-        // We only save the text context.
-        await addMessageToSession(sessionId, {
-          id: timestamp.toString(),
-          role: "user",
-          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
-          // image: image ? `data:${image.mime};base64,${image.data}` : undefined, // Removed to prevent Firestore size error
-          timestamp: timestamp,
-        });
-
-        // Model Output
         await addMessageToSession(sessionId, {
           id: (timestamp + 1).toString(),
           role: "model",

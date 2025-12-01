@@ -123,12 +123,32 @@ export const AdminPanel: React.FC = () => {
     };
   }, [isAdmin, selectedSession?.id]); // Re-subscribe if needed, but mainly just handle updates
 
-  // Scroll to bottom of chat when opening or updating
+  // Scroll logic: Chat -> Bottom, Others -> Top
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (selectedSession) {
+      if (!selectedSession.type || selectedSession.type === SessionType.CHAT) {
+        // Chat: Scroll to bottom to see latest
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      } else {
+        // Solver/Study/Translate: Scroll to top to see Input/Context
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = 0;
+        }
+      }
+    }
+  }, [selectedSession?.id]); // Only run on session switch, not every message update (to allow manual scrolling)
+
+  // Auto-scroll for Chat ONLY on new messages (live updates)
+  useEffect(() => {
+    if (
+      selectedSession &&
+      (!selectedSession.type || selectedSession.type === SessionType.CHAT)
+    ) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [selectedSession?.messages]);
+  }, [selectedSession?.messages.length]); // Trigger on message count change
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,7 +385,10 @@ export const AdminPanel: React.FC = () => {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-canvas custom-scrollbar">
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto p-6 space-y-6 bg-canvas custom-scrollbar"
+                >
                   {selectedSession.messages.map((msg) => {
                     // Admin perspective:
                     // User messages are "incoming" (left)

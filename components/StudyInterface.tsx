@@ -19,6 +19,7 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
   const [usage, setUsage] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const isCreatingSessionRef = useRef(false); // Prevent double creation
 
   // Guest ID logic
   const [guestId] = useState(() => {
@@ -34,9 +35,11 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
     const initSession = async () => {
       if (authLoading) return;
       if (sessionId) return;
+      if (isCreatingSessionRef.current) return;
 
       const effectiveUserId = user?.uid || guestId;
       if (effectiveUserId) {
+        isCreatingSessionRef.current = true;
         try {
           const id = await createNewSession(
             effectiveUserId,
@@ -49,6 +52,7 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
           setSessionId(id);
         } catch (e) {
           console.error("Failed to create study session", e);
+          isCreatingSessionRef.current = false;
         }
       }
     };
@@ -64,21 +68,23 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
     setUsage(null);
 
     try {
-        const response = await generateStudyMaterial(input, targetLang);
-        setResult(response.data);
-        setUsage(response.usage);
-
-        // Save to DB
+        // Save User Input to DB immediately
+        const timestamp = Date.now();
         if (sessionId) {
-          const timestamp = Date.now();
-          // User Input
           await addMessageToSession(sessionId, {
             id: timestamp.toString(),
             role: 'user',
             text: `[Generate Study Material in ${targetLang}] ${input}`,
             timestamp: timestamp,
           });
+        }
 
+        const response = await generateStudyMaterial(input, targetLang);
+        setResult(response.data);
+        setUsage(response.usage);
+
+        // Save Model Output to DB
+        if (sessionId) {
           // Format Output as Markdown for storage
           const formattedOutput = `**Summary:**\n${response.data.summary}\n\n**Questions:**\n${response.data.questions.map((q, i) => `${i+1}. ${q.question}\n   *Answer: ${q.answer}*`).join('\n')}`;
 
