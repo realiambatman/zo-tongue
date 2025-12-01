@@ -448,7 +448,11 @@ export const AdminPanel: React.FC = () => {
                               isIncoming ? "text-left" : "text-right"
                             }`}
                           >
-                            {new Date(msg.timestamp).toLocaleTimeString()}
+                            {new Date(msg.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -599,6 +603,7 @@ const SessionCard: React.FC<{
         {new Date(session.lastUpdated).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
+          hour12: true,
         })}
       </span>
     </div>
