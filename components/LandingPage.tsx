@@ -353,33 +353,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* ========================================
           HERO SECTION - Cinematic & Immersive
           ======================================== */}
-      <section className="relative bg-ink overflow-hidden">
+      <section className="relative bg-ink overflow-hidden h-[30vh] md:h-auto min-h-[550px] flex flex-col justify-center">
         {/* Atmospheric Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* Soft gradient orbs */}
-          <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/5 blur-[120px] animate-pulse-slow"></div>
-          <div className="absolute top-1/4 -right-1/4 w-[50%] h-[50%] rounded-full bg-indigo-400/5 blur-[100px] animate-float"></div>
-          <div className="absolute -bottom-1/4 left-1/3 w-[40%] h-[40%] rounded-full bg-violet-500/5 blur-[80px] animate-float-delayed"></div>
+          {/* Soft gradient orbs - Enhanced for Mobile */}
+          <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/10 blur-[80px] animate-pulse-slow md:bg-accent/5 md:blur-[120px]"></div>
+          <div className="absolute top-1/4 -right-1/4 w-[70%] h-[70%] rounded-full bg-indigo-500/10 blur-[60px] animate-float md:w-[50%] md:h-[50%] md:bg-indigo-400/5 md:blur-[100px]"></div>
+          <div className="absolute -bottom-1/4 left-1/3 w-[60%] h-[60%] rounded-full bg-violet-500/10 blur-[80px] animate-float-delayed md:w-[40%] md:h-[40%] md:bg-violet-500/5"></div>
+
+          {/* Mobile Specific Animated Gradient Mesh */}
+          <div className="absolute inset-0 opacity-30 md:hidden bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.2),transparent_70%)] animate-pulse-slow"></div>
 
           {/* Subtle grid pattern */}
           <div
-            className="absolute inset-0 opacity-[0.02]"
+            className="absolute inset-0 opacity-[0.05] md:opacity-[0.02]"
             style={{
               backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-              backgroundSize: "60px 60px",
+              backgroundSize: "40px 40px",
             }}
           ></div>
 
-          {/* Large Decorative Text - Hero Background */}
+          {/* Large Decorative Text - Hero Background - Animated on Mobile */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none select-none overflow-hidden w-full">
-            <span className="font-display text-[18vw] font-bold uppercase tracking-tighter text-white/[0.03] whitespace-nowrap block scale-110 opacity-70">
+            <span className="font-display text-[25vw] md:text-[18vw] font-bold uppercase tracking-tighter text-white/[0.04] whitespace-nowrap block scale-110 opacity-50 md:opacity-70 animate-pan-x-slow md:animate-none">
               ZOTONGUE
             </span>
           </div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-12 pb-12 lg:pt-32 lg:pb-40">
-          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-16 lg:mb-0">
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 pt-12 pb-12 lg:pt-32 lg:pb-40 w-full">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-8 lg:mb-0">
             {/* Text Content */}
             <div
               className={`w-full lg:w-1/2 text-center lg:text-left transition-all duration-1000 ${
@@ -390,19 +393,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               {/* Main Headline - Large, Bold, Swiss Style */}
               <h1
-                className="font-display text-[13vw] md:text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.8] lg:leading-[0.75] uppercase text-white mb-8 mix-blend-overlay"
+                className="font-display text-[15vw] sm:text-[13vw] md:text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.85] lg:leading-[0.75] uppercase text-white mb-6 md:mb-8 mix-blend-overlay"
                 style={staggerDelay(1)}
               >
                 Master
                 <br />
-                <span className="text-transparent stroke-text">Languages</span>
+                <span className="text-transparent stroke-text bg-clip-text bg-gradient-to-r from-white via-white/50 to-transparent md:bg-none">
+                  Languages
+                </span>
                 <br />
                 Effortlessly
               </h1>
 
               {/* Subtitle - Adjusted for Swiss Grid alignment */}
               <p
-                className="text-lg lg:text-xl text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-12 border-l border-slate-800 pl-6 text-left"
+                className="text-base sm:text-lg lg:text-xl text-slate-300 md:text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-8 md:mb-12 border-l-0 md:border-l border-slate-800 pl-0 md:pl-6 text-center md:text-left"
                 style={staggerDelay(2)}
               >
                 The most advanced AI platform for the Zo language family.
@@ -412,12 +417,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               {/* CTA Buttons */}
               <div
-                className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4 w-full sm:w-auto"
+                className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4 w-full sm:w-auto px-4 sm:px-0"
                 style={staggerDelay(3)}
               >
                 <button
                   onClick={() => onNavigate(AppMode.CHAT)}
-                  className="group px-8 py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  className="group w-full sm:w-auto px-8 py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                   Start Chatting
                   <svg
@@ -436,10 +441,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </button>
                 <button
                   onClick={() => onNavigate(AppMode.SOLVER)}
-                  className="group px-8 py-4 bg-white/5 backdrop-blur-sm text-white border border-white/10 rounded-full font-semibold text-sm hover:bg-white/10 transition-all duration-300 flex items-center justify-center gap-2"
+                  className="group w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-full font-semibold text-sm hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2"
                 >
                   <svg
-                    className="w-4 h-4 text-violet-400"
+                    className="w-4 h-4 text-violet-300"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
