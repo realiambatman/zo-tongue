@@ -1,4 +1,4 @@
-import { GoogleGenAI, Chat, Type, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Chat, Type, ThinkingLevel, Content } from "@google/genai";
 import { SupportedLanguage, StudyData } from "../types";
 import { MODEL_NAME } from "../constants";
 
@@ -7,7 +7,10 @@ const ai = new GoogleGenAI({
   apiKey: "REDACTED",
 });
 
-export const createChatSession = (language: SupportedLanguage): Chat => {
+export const createChatSession = (
+  language: SupportedLanguage,
+  history?: Content[]
+): Chat => {
   const systemInstruction = `
     You are a helpful, native-level AI assistant fluent in ${language}.
     
@@ -31,6 +34,7 @@ export const createChatSession = (language: SupportedLanguage): Chat => {
         thinkingLevel: ThinkingLevel.HIGH, // Use high thinking level for better reasoning
       },
     },
+    history: history,
   });
 };
 

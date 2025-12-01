@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Check if user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if the current user owns the document
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Helper: Check if the user is an Admin
+    function isAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email.matches('.*@buildnbit[.]com');
+    }
+
+    // Rules for Chat Sessions
+    match /chats/{chatId} {
+      // Admins can read/write everything
+      allow read, write: if isAdmin();
+
+      // ALLOW create for everyone (including unauthenticated guests)
+      allow create: if true;
+
+      // ALLOW read/update for everyone (to support unauthenticated guest persistence)
+      // Note: In production, you should enable Anonymous Auth and enforce isOwner()
+      allow read, update: if true;
+    }
+
+    // Default deny for other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
