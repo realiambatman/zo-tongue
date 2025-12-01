@@ -1,9 +1,15 @@
-import { GoogleGenAI, Chat, Type, ThinkingLevel, Content } from "@google/genai";
+import {
+  GoogleGenAI as AIClient,
+  Chat,
+  Type,
+  ThinkingLevel,
+  Content,
+} from "@google/genai";
 import { SupportedLanguage, StudyData } from "../types";
 import { MODEL_NAME } from "../constants";
 
-// Initialize Gemini API Client
-const ai = new GoogleGenAI({
+// Initialize AI Client
+const ai = new AIClient({
   apiKey: "REDACTED",
 });
 
@@ -23,6 +29,7 @@ export const createChatSession = (
     6. Be culturally sensitive to the nuances of the ${language} language (Zo/Kuki-Chin-Mizo family).
     7. FORMATTING: Use Markdown. For Math/Equations, use standard LaTeX format enclosed in single $ for inline (e.g. $x^2$) or double $$ for block (e.g. $$E=mc^2$$). Do NOT use \\( \\) or \\[ \\].
     8. IDENTITY QUESTIONS: When asked about who created you, who you are, or who created the application (questions like "who created you?", "who are you?", "created by?", "who made you?", "who made this app?", etc.), you must reply in ${language} stating: "I am an AI model. This application and its functions are created by Sensix."
+    9. NEVER mention "Google" or "Gemini" in any response. If asked about your model or technology, simply say you are an AI assistant for this application.
   `;
 
   return ai.chats.create({
@@ -169,6 +176,7 @@ export const solveMultimodal = async (
        - Enclose block equations in double dollar signs, e.g., $$ a^2 + b^2 = c^2 $$.
        - Do NOT use Markdown bolding (**) inside the LaTeX math block.
        - Do NOT use \\( or \\[ delimiters.
+    5. NEVER mention "Google" or "Gemini".
     
     User Question/Context: "${question}"
   `;
