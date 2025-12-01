@@ -8,7 +8,7 @@ import {
   ChatSession,
   UserProfile,
 } from "../services/dbService";
-import { ChatMessage } from "../types";
+import { ChatMessage, SessionType } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 export const AdminPanel: React.FC = () => {
@@ -405,6 +405,15 @@ export const AdminPanel: React.FC = () => {
                                 : "bg-slate-100 text-ink border border-slate-200 rounded-3xl rounded-br-lg"
                             }`}
                           >
+                            {msg.image && (
+                              <div className="mb-3">
+                                <img
+                                  src={msg.image}
+                                  alt="Attached"
+                                  className="rounded-xl border border-slate-200 max-h-64 object-contain bg-slate-50"
+                                />
+                              </div>
+                            )}
                             {msg.role === "user" || msg.isAdminReply ? (
                               msg.text
                             ) : (
@@ -490,13 +499,75 @@ const SessionCard: React.FC<{
     }`}
   >
     <div className="flex justify-between items-start mb-2">
-      <span
-        className={`font-mono text-[10px] uppercase tracking-widest ${
-          isSelected ? "text-slate-400" : "text-slate-500"
-        }`}
-      >
-        {session.language}
-      </span>
+      <div className="flex items-center gap-2">
+        {(!session.type || session.type === SessionType.CHAT) && (
+          <svg
+            className="w-3 h-3 text-indigo-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+            />
+          </svg>
+        )}
+        {session.type === SessionType.TRANSLATE && (
+          <svg
+            className="w-3 h-3 text-emerald-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
+            />
+          </svg>
+        )}
+        {session.type === SessionType.STUDY && (
+          <svg
+            className="w-3 h-3 text-amber-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            />
+          </svg>
+        )}
+        {session.type === SessionType.SOLVER && (
+          <svg
+            className="w-3 h-3 text-rose-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+            />
+          </svg>
+        )}
+        <span
+          className={`font-mono text-[10px] uppercase tracking-widest ${
+            isSelected ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
+          {session.language}
+        </span>
+      </div>
       <span
         className={`text-[10px] ${
           isSelected ? "text-slate-400" : "text-slate-400"

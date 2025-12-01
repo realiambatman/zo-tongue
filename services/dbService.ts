@@ -13,7 +13,7 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { ChatMessage, SupportedLanguage } from "../types";
+import { ChatMessage, SupportedLanguage, SessionType } from "../types";
 
 export interface ChatSession {
   id: string;
@@ -26,6 +26,7 @@ export interface ChatSession {
   messages: ChatMessage[];
   isAnonymous: boolean;
   isAiPaused?: boolean; // New flag to pause AI responses
+  type?: SessionType;
 }
 
 export interface UserProfile {
@@ -77,19 +78,22 @@ export const createNewSession = async (
   userId: string,
   language: SupportedLanguage,
   userEmail?: string | null,
-  isAnonymous: boolean = true
+  isAnonymous: boolean = true,
+  type: SessionType = SessionType.CHAT,
+  title?: string
 ): Promise<string> => {
   try {
     const sessionsRef = collection(db, "chats");
     const newSession: Partial<ChatSession> = {
       userId,
       userEmail: userEmail || null,
-      title: `Chat in ${language}`,
+      title: title || `Chat in ${language}`,
       language,
       startTime: Date.now(),
       lastUpdated: Date.now(),
       messages: [],
       isAnonymous,
+      type,
     };
     const docRef = await addDoc(sessionsRef, newSession);
     return docRef.id;

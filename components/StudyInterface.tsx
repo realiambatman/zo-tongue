@@ -1,20 +1,59 @@
-import React, { useState } from 'react';
-import { SupportedLanguage, StudyData } from '../types';
+import React, { useState, useEffect } from 'react';
+import { SupportedLanguage, StudyData, SessionType } from '../types';
 import { generateStudyMaterial } from '../services/geminiService';
 import { LanguageSelector } from './LanguageSelector';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { useAuth } from '../contexts/AuthContext';
+import { createNewSession, addMessageToSession } from '../services/dbService';
 
 interface StudyInterfaceProps {
   onBack: () => void;
 }
 
 const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
+  const { user, loading: authLoading } = useAuth();
   const [targetLang, setTargetLang] = useState<SupportedLanguage>(SupportedLanguage.Paite);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<StudyData | null>(null);
   const [usage, setUsage] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Guest ID logic
+  const [guestId] = useState(() => {
+    const stored = localStorage.getItem("zotongue_guest_id");
+    if (stored) return stored;
+    const newId = "guest_" + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem("zotongue_guest_id", newId);
+    return newId;
+  });
+
+  // Initialize Session
+  useEffect(() => {
+    const initSession = async () => {
+      if (authLoading) return;
+      if (sessionId) return;
+
+      const effectiveUserId = user?.uid || guestId;
+      if (effectiveUserId) {
+        try {
+          const id = await createNewSession(
+            effectiveUserId,
+            targetLang,
+            user?.email || null,
+            !user,
+            SessionType.STUDY,
+            "Study Session"
+          );
+          setSessionId(id);
+        } catch (e) {
+          console.error("Failed to create study session", e);
+        }
+      }
+    };
+    initSession();
+  }, [user, guestId, authLoading, sessionId]);
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
@@ -28,6 +67,29 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
         const response = await generateStudyMaterial(input, targetLang);
         setResult(response.data);
         setUsage(response.usage);
+
+        // Save to DB
+        if (sessionId) {
+          const timestamp = Date.now();
+          // User Input
+          await addMessageToSession(sessionId, {
+            id: timestamp.toString(),
+            role: 'user',
+            text: `[Generate Study Material in ${targetLang}] ${input}`,
+            timestamp: timestamp,
+          });
+
+          // Format Output as Markdown for storage
+          const formattedOutput = `**Summary:**\n${response.data.summary}\n\n**Questions:**\n${response.data.questions.map((q, i) => `${i+1}. ${q.question}\n   *Answer: ${q.answer}*`).join('\n')}`;
+
+          await addMessageToSession(sessionId, {
+            id: (timestamp + 1).toString(),
+            role: 'model',
+            text: formattedOutput,
+            timestamp: timestamp + 1,
+            usage: response.usage
+          });
+        }
     } catch (e) {
         setError("Failed to generate study materials. Please try again.");
     } finally {

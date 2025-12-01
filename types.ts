@@ -5,6 +5,13 @@ export enum AppMode {
   SOLVER = "SOLVER",
 }
 
+export enum SessionType {
+  CHAT = "CHAT",
+  TRANSLATE = "TRANSLATE",
+  STUDY = "STUDY",
+  SOLVER = "SOLVER",
+}
+
 export enum SupportedLanguage {
   English = "English",
   Paite = "Paite",
@@ -25,6 +32,7 @@ export interface ChatMessage {
   isError?: boolean;
   isSystem?: boolean;
   isAdminReply?: boolean; // New flag for admin replies
+  image?: string; // Base64 or URL for solver images
   usage?: {
     thoughtsTokenCount?: number;
     candidatesTokenCount?: number;
