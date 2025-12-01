@@ -356,21 +356,26 @@ export const AdminPanel: React.FC = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button
-                      onClick={() =>
-                        toggleAiPause(
-                          selectedSession.id,
-                          !selectedSession.isAiPaused
-                        )
-                      }
-                      className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${
-                        selectedSession.isAiPaused
-                          ? "bg-white text-ink border-slate-200 hover:bg-slate-50"
-                          : "bg-ink text-white border-ink hover:bg-slate-800"
-                      }`}
-                    >
-                      {selectedSession.isAiPaused ? "AI Paused" : "AI Active"}
-                    </button>
+                    {(!selectedSession.type ||
+                      selectedSession.type === SessionType.CHAT) && (
+                      <button
+                        onClick={() =>
+                          toggleAiPause(
+                            selectedSession.id,
+                            !selectedSession.isAiPaused
+                          )
+                        }
+                        className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                          selectedSession.isAiPaused
+                            ? "bg-white text-ink border-slate-200 hover:bg-slate-50"
+                            : "bg-ink text-white border-ink hover:bg-slate-800"
+                        }`}
+                      >
+                        {selectedSession.isAiPaused
+                          ? "AI Paused"
+                          : "AI Active"}
+                      </button>
+                    )}
                     <span
                       className={`w-3 h-3 rounded-full ${
                         selectedSession.isAnonymous
@@ -461,28 +466,31 @@ export const AdminPanel: React.FC = () => {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Reply Input */}
-                <div className="p-4 bg-white border-t border-slate-100">
-                  <form
-                    onSubmit={handleSendReply}
-                    className="flex items-center gap-4"
-                  >
-                    <input
-                      type="text"
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder="Type a reply as Admin..."
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!replyText.trim()}
-                      className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                {/* Reply Input - Only for Chat Sessions */}
+                {(!selectedSession.type ||
+                  selectedSession.type === SessionType.CHAT) && (
+                  <div className="p-4 bg-white border-t border-slate-100">
+                    <form
+                      onSubmit={handleSendReply}
+                      className="flex items-center gap-4"
                     >
-                      Send
-                    </button>
-                  </form>
-                </div>
+                      <input
+                        type="text"
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Type a reply as Admin..."
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!replyText.trim()}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                      >
+                        Send
+                      </button>
+                    </form>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
