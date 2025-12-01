@@ -100,11 +100,13 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
       if (sessionId) {
         const timestamp = Date.now();
         // User Input
+        // NOTE: We do not save the full Base64 image to Firestore to avoid hitting the 1MB document limit.
+        // We only save the text context.
         await addMessageToSession(sessionId, {
           id: timestamp.toString(),
           role: "user",
-          text: `[Solve in ${targetLang}] ${input || "(Image Only)"}`,
-          image: image ? `data:${image.mime};base64,${image.data}` : undefined,
+          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
+          // image: image ? `data:${image.mime};base64,${image.data}` : undefined, // Removed to prevent Firestore size error
           timestamp: timestamp,
         });
 
