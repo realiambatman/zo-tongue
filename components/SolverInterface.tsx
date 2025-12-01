@@ -123,14 +123,14 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
           <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
             Visual Problem Solving
           </p>
-        </div>
+      </div>
         <div className="w-44">
-          <LanguageSelector
-            selected={targetLang}
-            onChange={setTargetLang}
-            label="Answer Language"
-          />
-        </div>
+            <LanguageSelector
+              selected={targetLang}
+              onChange={setTargetLang}
+              label="Answer Language"
+            />
+          </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-5 pb-28 space-y-5 custom-scrollbar">
@@ -143,12 +143,12 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
             onClick={() => fileInputRef.current?.click()}
             className={`
               relative w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden flex flex-col items-center justify-center
-              ${
-                image
+                    ${
+                      image
                   ? "border-accent bg-ink"
                   : "border-slate-200 bg-surface hover:bg-slate-50 hover:border-accent/50"
-              }
-            `}
+                    }
+                `}
           >
             <input
               type="file"
@@ -259,19 +259,19 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
           <div className="bg-accent-light rounded-3xl shadow-card border border-accent/10 overflow-hidden animate-enter">
             <div className="px-5 py-4 bg-accent/5 border-b border-accent/10 flex items-center gap-3">
               <div className="w-8 h-8 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-                <svg
+              <svg
                   className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                />
+              </svg>
               </div>
               <h3 className="font-display font-bold text-accent text-sm">Solution</h3>
             </div>

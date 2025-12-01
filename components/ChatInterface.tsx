@@ -23,7 +23,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onBack,
   initialSessionId,
 }) => {
-  const { user, signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle, loading: authLoading } = useAuth();
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(
     SupportedLanguage.Paite
   );
@@ -39,6 +39,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  const isCreatingSessionRef = useRef(false); // Prevent double creation
   // Fallback ID for guests if Auth fails
   const [guestId] = useState(() => {
     const stored = localStorage.getItem("zotongue_guest_id");
@@ -169,10 +170,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // Create Firestore session on mount (or when user becomes available) if not loading existing
   useEffect(() => {
     const initFirestoreSession = async () => {
+      // Wait for auth to settle to avoid race conditions (null -> user)
+      if (authLoading) return;
+
+      // Prevent double creation in Strict Mode or rapid updates
+      if (isCreatingSessionRef.current) return;
+
       // Create session if we have a user OR a guestId, and no session yet
       const effectiveUserId = user?.uid || guestId;
 
       if (effectiveUserId && !sessionId && !initialSessionId) {
+        isCreatingSessionRef.current = true;
         try {
           const id = await createNewSession(
             effectiveUserId,
@@ -183,11 +191,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           setSessionId(id);
         } catch (error) {
           console.error("Failed to create firestore session", error);
+          isCreatingSessionRef.current = false; // Allow retry on error
         }
       }
     };
     initFirestoreSession();
-  }, [user, sessionId, guestId]); // Added guestId dependency
+  }, [user, sessionId, guestId, authLoading, initialSessionId]); // Added authLoading and ref logic
 
   // Save messages to Firestore whenever they change
   useEffect(() => {

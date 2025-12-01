@@ -34,7 +34,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           ),
           // Styled code blocks
           code: ({ node, inline, className, children, ...props }: any) => {
-            if (inline) {
+             if (inline) {
               return (
                 <code 
                   className="bg-slate-100 text-ink rounded-md px-1.5 py-0.5 text-[13px] font-mono" 
@@ -43,7 +43,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   {children}
                 </code>
               );
-            }
+             }
             return (
               <code 
                 className="block bg-ink text-slate-100 rounded-xl p-4 my-3 text-[13px] font-mono overflow-x-auto" 

@@ -25,13 +25,13 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
     setUsage(null);
 
     try {
-      const response = await generateStudyMaterial(input, targetLang);
-      setResult(response.data);
-      setUsage(response.usage);
+        const response = await generateStudyMaterial(input, targetLang);
+        setResult(response.data);
+        setUsage(response.usage);
     } catch (e) {
-      setError("Failed to generate study materials. Please try again.");
+        setError("Failed to generate study materials. Please try again.");
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -52,7 +52,7 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
           <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
             AI-Powered Learning
           </p>
-        </div>
+      </div>
       </header>
 
       <div className="flex-1 overflow-y-auto p-5 pb-28 space-y-5 custom-scrollbar">
@@ -69,15 +69,15 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
               </p>
             </div>
             <div className="w-44 shrink-0">
-              <LanguageSelector selected={targetLang} onChange={setTargetLang} label="Output Language" />
+                    <LanguageSelector selected={targetLang} onChange={setTargetLang} label="Output Language" />
+                </div>
             </div>
-          </div>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
             placeholder="Paste any text here to generate a summary and study questions..."
             className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 focus:border-accent focus:ring-2 focus:ring-accent/20 min-h-[140px] text-[15px] leading-relaxed resize-none transition-all duration-300 text-ink placeholder-ink-muted/50 focus:outline-none"
-          />
+            />
         </div>
 
         {/* Loading State */}
@@ -85,7 +85,7 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
           <div className="py-16 flex flex-col items-center justify-center text-accent space-y-4">
             <div className="w-10 h-10 border-2 border-accent/20 border-t-accent rounded-full animate-spin"></div>
             <p className="font-mono text-sm animate-pulse tracking-wide">Analyzing text & generating questions...</p>
-          </div>
+             </div>
         )}
 
         {/* Error State */}
@@ -94,40 +94,40 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
             <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            {error}
-          </div>
+                 {error}
+             </div>
         )}
 
         {/* Results Section */}
         {result && (
           <div className="space-y-6 animate-enter">
-            {/* Summary Card */}
+                {/* Summary Card */}
             <div className="bg-success-light rounded-3xl shadow-card border border-success/10 overflow-hidden">
               <div className="px-5 py-4 bg-success/5 border-b border-success/10 flex items-center gap-3">
                 <div className="w-8 h-8 bg-success/10 rounded-xl flex items-center justify-center text-success">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                        </svg>
                 </div>
                 <h3 className="font-display font-bold text-success text-sm">Summary & Explanation</h3>
-              </div>
+                    </div>
               <div className="p-5">
                 <MarkdownRenderer content={result.summary} className="text-ink prose-emerald" />
-              </div>
-            </div>
+                    </div>
+                </div>
 
-            {/* Q&A Section */}
+                {/* Q&A Section */}
             <div className="space-y-4">
               <div className="flex items-center gap-3 px-1">
                 <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center text-ink-muted">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                 </div>
                 <h3 className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">Study Questions</h3>
-              </div>
-              
-              {result.questions.map((qa, idx) => (
+                    </div>
+                    
+                    {result.questions.map((qa, idx) => (
                 <div 
                   key={idx} 
                   className="bg-surface rounded-2xl border border-slate-100 shadow-card overflow-hidden animate-enter"
@@ -147,33 +147,33 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
                       <div className="text-ink-muted text-sm leading-relaxed">
                         <MarkdownRenderer content={qa.answer} />
                       </div>
-                    </div>
-                  </div>
+                             </div>
+                             </div>
+                        </div>
+                    ))}
                 </div>
-              ))}
-            </div>
 
             {/* Usage Stats */}
-            {usage && (
+                {usage && (
               <div className="pt-4 border-t border-slate-100 font-mono text-[10px] text-ink-muted flex items-center gap-4">
                 <span>{usage.candidatesTokenCount || 0} output</span>
-                {usage.thoughtsTokenCount && usage.thoughtsTokenCount > 0 && (
+                    {usage.thoughtsTokenCount && usage.thoughtsTokenCount > 0 && (
                   <span className="text-accent">• {usage.thoughtsTokenCount} thoughts</span>
+                    )}
+                    {usage.totalTokenCount && (
+                      <span>• {usage.totalTokenCount} total</span>
+                    )}
+                  </div>
                 )}
-                {usage.totalTokenCount && (
-                  <span>• {usage.totalTokenCount} total</span>
-                )}
-              </div>
-            )}
-          </div>
+            </div>
         )}
       </div>
 
       {/* Floating Action Button */}
       <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-canvas via-canvas to-transparent pt-10">
         <button
-          onClick={handleGenerate}
-          disabled={isLoading || !input.trim()}
+            onClick={handleGenerate}
+            disabled={isLoading || !input.trim()}
           className="flex items-center justify-center w-full py-4 bg-success text-white rounded-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-40 disabled:bg-slate-300 transition-all duration-300 disabled:cursor-not-allowed font-semibold text-[15px]"
         >
           {isLoading ? (

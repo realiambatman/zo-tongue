@@ -31,6 +31,14 @@ service cloud.firestore {
       allow read, update: if true;
     }
 
+    // Rules for Users Collection
+    match /users/{userId} {
+      // Admins can read everything
+      allow read: if isAdmin();
+      // Users can read/write their own profile
+      allow read, write: if isOwner(userId);
+    }
+
     // Default deny for other collections
     match /{document=**} {
       allow read, write: if false;

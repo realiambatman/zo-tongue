@@ -2,9 +2,11 @@ import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import {
   subscribeToAllSessions,
+  subscribeToAllUsers,
   addMessageToSession,
   toggleAiPause,
   ChatSession,
+  UserProfile,
 } from "../services/dbService";
 import { ChatMessage } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -12,6 +14,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 export const AdminPanel: React.FC = () => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(
     null
@@ -47,7 +50,7 @@ export const AdminPanel: React.FC = () => {
     .sort((a, b) => b.lastUpdated - a.lastUpdated);
 
   // Group user sessions by email
-  const usersMap = userSessions.reduce((acc, session) => {
+  const sessionsByEmail = userSessions.reduce((acc, session) => {
     const email = session.userEmail!;
     if (!acc[email]) {
       acc[email] = [];
@@ -56,19 +59,47 @@ export const AdminPanel: React.FC = () => {
     return acc;
   }, {} as Record<string, ChatSession[]>);
 
-  const uniqueUsers = Object.keys(usersMap)
-    .map((email) => ({
-      email,
-      sessions: usersMap[email].sort((a, b) => b.lastUpdated - a.lastUpdated),
-      lastActive: Math.max(...usersMap[email].map((s) => s.lastUpdated)),
-    }))
-    .sort((a, b) => b.lastActive - a.lastActive);
+  // Create unified user list
+  const allDisplayUsers = users.map((user) => {
+    const userSessions = sessionsByEmail[user.email] || [];
+    return {
+      email: user.email,
+      displayName: user.displayName,
+      sessions: userSessions.sort((a, b) => b.lastUpdated - a.lastUpdated),
+      lastActive: Math.max(
+        user.lastLogin,
+        ...(userSessions.map((s) => s.lastUpdated) || [0])
+      ),
+    };
+  });
+
+  // Add users who have sessions but NO user profile (legacy/edge case)
+  const registeredEmails = new Set(users.map((u) => u.email));
+  Object.keys(sessionsByEmail).forEach((email) => {
+    if (!registeredEmails.has(email)) {
+      allDisplayUsers.push({
+        email,
+        displayName: null,
+        sessions: sessionsByEmail[email].sort(
+          (a, b) => b.lastUpdated - a.lastUpdated
+        ),
+        lastActive: Math.max(
+          ...sessionsByEmail[email].map((s) => s.lastUpdated)
+        ),
+      });
+    }
+  });
+
+  const uniqueUsers = allDisplayUsers.sort(
+    (a, b) => b.lastActive - a.lastActive
+  );
 
   useEffect(() => {
-    let unsubscribe: () => void;
+    let unsubscribeSessions: () => void;
+    let unsubscribeUsers: () => void;
 
     if (isAdmin) {
-      unsubscribe = subscribeToAllSessions((allSessions) => {
+      unsubscribeSessions = subscribeToAllSessions((allSessions) => {
         setSessions(allSessions);
         setLoading(false);
 
@@ -78,12 +109,17 @@ export const AdminPanel: React.FC = () => {
           if (updated) setSelectedSession(updated);
         }
       });
+
+      unsubscribeUsers = subscribeToAllUsers((allUsers) => {
+        setUsers(allUsers);
+      });
     } else {
       setLoading(false);
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeSessions) unsubscribeSessions();
+      if (unsubscribeUsers) unsubscribeUsers();
     };
   }, [isAdmin, selectedSession?.id]); // Re-subscribe if needed, but mainly just handle updates
 
@@ -232,17 +268,21 @@ export const AdminPanel: React.FC = () => {
                         {selectedUserEmail}
                       </p>
                       <p className="text-[10px] text-indigo-700/70">
-                        {usersMap[selectedUserEmail]?.length || 0} Sessions
+                        {uniqueUsers.find((u) => u.email === selectedUserEmail)
+                          ?.sessions.length || 0}{" "}
+                        Sessions
                       </p>
                     </div>
-                    {usersMap[selectedUserEmail]?.map((session) => (
-                      <SessionCard
-                        key={session.id}
-                        session={session}
-                        isSelected={selectedSession?.id === session.id}
-                        onClick={() => setSelectedSession(session)}
-                      />
-                    ))}
+                    {uniqueUsers
+                      .find((u) => u.email === selectedUserEmail)
+                      ?.sessions.map((session) => (
+                        <SessionCard
+                          key={session.id}
+                          session={session}
+                          isSelected={selectedSession?.id === session.id}
+                          onClick={() => setSelectedSession(session)}
+                        />
+                      ))}
                   </>
                 ) : (
                   // Level 1: List of Unique Users

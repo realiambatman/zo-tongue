@@ -7,6 +7,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { auth, googleProvider } from "../services/firebase";
+import { saveUserProfile } from "../services/dbService";
 
 interface AuthContextType {
   user: User | null;
@@ -25,16 +26,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      
+      // Save/Update user profile on every auth state change (initial load included)
+      if (currentUser) {
+        await saveUserProfile({
+          uid: currentUser.uid,
+          email: currentUser.email!,
+          displayName: currentUser.displayName,
+          photoURL: currentUser.photoURL,
+          lastLogin: Date.now(),
+        });
+      }
     });
     return unsubscribe;
   }, []);
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      if (result.user) {
+        await saveUserProfile({
+          uid: result.user.uid,
+          email: result.user.email!,
+          displayName: result.user.displayName,
+          photoURL: result.user.photoURL,
+          lastLogin: Date.now(),
+        });
+      }
     } catch (error) {
       console.error("Error signing in with Google", error);
     }

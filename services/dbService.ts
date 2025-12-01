@@ -28,6 +28,35 @@ export interface ChatSession {
   isAiPaused?: boolean; // New flag to pause AI responses
 }
 
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string | null;
+  photoURL: string | null;
+  lastLogin: number;
+}
+
+export const saveUserProfile = async (user: UserProfile) => {
+  try {
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, user, { merge: true });
+  } catch (error) {
+    console.error("Error saving user profile:", error);
+  }
+};
+
+export const subscribeToAllUsers = (
+  callback: (users: UserProfile[]) => void
+): Unsubscribe => {
+  const q = query(collection(db, "users"), orderBy("lastLogin", "desc"));
+  return onSnapshot(q, (querySnapshot) => {
+    const users = querySnapshot.docs.map(
+      (doc) => ({ uid: doc.id, ...doc.data() } as UserProfile)
+    );
+    callback(users);
+  });
+};
+
 export const saveChatSession = async (session: ChatSession) => {
   try {
     const sessionRef = doc(db, "chats", session.id);
