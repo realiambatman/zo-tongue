@@ -25,10 +25,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   // Use rotation matrix for world-space rotations (avoids gimbal lock)
+  // Initial tilt: approximately rotateY(-30deg) * rotateX(-20deg) for a nice angled view
   const [rotationMatrix, setRotationMatrix] = useState<number[][]>([
-    [1, 0, 0],
-    [0, 1, 0],
-    [0, 0, 1],
+    [0.866, 0.171, -0.470],
+    [0, 0.940, 0.342],
+    [0.5, -0.296, 0.814],
   ]);
   const cubeRef = React.useRef<HTMLDivElement>(null);
   const { user, signInWithGoogle, signOut } = useAuth();
@@ -942,11 +943,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </div>
 
                   {/* Minimal Orbiting Elements - pushed behind cube */}
-                  <div 
+                  <div
                     className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"
                     style={{ transform: "translateZ(-200px)" }}
                   ></div>
-                  <div 
+                  <div
                     className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"
                     style={{ transform: "translateZ(-200px)" }}
                   ></div>
