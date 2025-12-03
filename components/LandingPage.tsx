@@ -27,8 +27,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // Use rotation matrix for world-space rotations (avoids gimbal lock)
   // Initial tilt: approximately rotateY(-30deg) * rotateX(-20deg) for a nice angled view
   const [rotationMatrix, setRotationMatrix] = useState<number[][]>([
-    [0.866, 0.171, -0.470],
-    [0, 0.940, 0.342],
+    [0.866, 0.171, -0.47],
+    [0, 0.94, 0.342],
     [0.5, -0.296, 0.814],
   ]);
   const cubeRef = React.useRef<HTMLDivElement>(null);
@@ -747,7 +747,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               >
                 {/* Floating Cube - Interactive */}
                 <div
-                  className="relative w-80 h-80 perspective-1000 z-10 cursor-grab active:cursor-grabbing"
+                  className="relative w-80 h-80 perspective-1000 z-20 cursor-grab active:cursor-grabbing"
                   onMouseDown={handleMouseDown}
                   onMouseMove={handleMouseMove}
                   onMouseUp={handleMouseUp}
@@ -942,15 +942,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     ></div>
                   </div>
 
-                  {/* Minimal Orbiting Elements - pushed behind cube */}
-                  <div
-                    className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"
-                    style={{ transform: "translateZ(-200px)" }}
-                  ></div>
-                  <div
-                    className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"
-                    style={{ transform: "translateZ(-200px)" }}
-                  ></div>
+                </div>
+
+                {/* Minimal Orbiting Elements - outside 3D context, always behind */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                  <div className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"></div>
+                  <div className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"></div>
                 </div>
               </div>
             </div>
