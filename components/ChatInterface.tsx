@@ -42,6 +42,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   const isCreatingSessionRef = useRef(false); // Prevent double creation
+  const sessionIdRef = useRef<string | null>(null); // Track sessionId to avoid closure issues
   // Fallback ID for guests if Auth fails
   const [guestId] = useState(() => {
     const stored = localStorage.getItem("zotongue_guest_id");
@@ -61,6 +62,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           const session = await getSessionById(initialSessionId);
           if (session) {
             setSessionId(session.id);
+            sessionIdRef.current = session.id; // Update ref immediately
             // Important: Set messages first to prevent race conditions with language switch
             setMessages(session.messages);
             setSelectedLanguage(session.language);
@@ -170,42 +172,65 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return () => unsubscribe();
   }, [sessionId]);
 
+  // Keep sessionIdRef in sync with sessionId state
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
   // Helper to create session lazily (only when first message is sent)
-  const ensureSessionExists = useCallback(async (): Promise<string | null> => {
-    if (sessionId) return sessionId;
-    if (initialSessionId) return initialSessionId;
-    if (isCreatingSessionRef.current) return null;
-
-    const effectiveUserId = user?.uid || guestId;
-    if (!effectiveUserId) return null;
-
-    isCreatingSessionRef.current = true;
-    try {
-      const isGuest = !user;
-      let ipAddress: string | null = null;
-      if (isGuest) {
-        ipAddress = await fetchUserIP();
+  // Note: Uses sessionIdRef to avoid closure issues with stale sessionId
+  // Returns { id, isNew } to indicate if session was newly created
+  const ensureSessionExists = useCallback(
+    async (
+      currentLanguage: SupportedLanguage
+    ): Promise<{ id: string; isNew: boolean } | null> => {
+      // Use ref to get the most current sessionId value
+      if (sessionIdRef.current)
+        return { id: sessionIdRef.current, isNew: false };
+      if (initialSessionId) return { id: initialSessionId, isNew: false };
+      if (isCreatingSessionRef.current) {
+        // Wait a bit and check again if session was created
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (sessionIdRef.current)
+          return { id: sessionIdRef.current, isNew: false };
+        return null;
       }
 
-      const id = await createNewSession(
-        effectiveUserId,
-        selectedLanguage,
-        user?.email || null,
-        true,
-        undefined,
-        undefined,
-        ipAddress
-      );
-      setSessionId(id);
-      return id;
-    } catch (error) {
-      console.error("Failed to create firestore session", error);
-      isCreatingSessionRef.current = false;
-      return null;
-    }
-  }, [sessionId, initialSessionId, user, guestId, selectedLanguage]);
+      const effectiveUserId = user?.uid || guestId;
+      if (!effectiveUserId) return null;
+
+      isCreatingSessionRef.current = true;
+      try {
+        const isGuest = !user;
+        let ipAddress: string | null = null;
+        if (isGuest) {
+          ipAddress = await fetchUserIP();
+        }
+
+        const id = await createNewSession(
+          effectiveUserId,
+          currentLanguage,
+          user?.email || null,
+          true,
+          undefined,
+          undefined,
+          ipAddress
+        );
+        setSessionId(id);
+        sessionIdRef.current = id; // Update ref immediately
+        return { id, isNew: true };
+      } catch (error) {
+        console.error("Failed to create firestore session", error);
+        return null;
+      } finally {
+        isCreatingSessionRef.current = false; // Always reset, success or failure
+      }
+    },
+    [initialSessionId, user, guestId]
+  );
 
   // Save messages to Firestore whenever they change (only if there are real messages)
+  // Also saves when language changes to update the session language
   useEffect(() => {
     // Only save if there are actual user/model messages (not just system messages)
     const hasRealMessages = messages.some((m) => !m.isSystem);
@@ -223,7 +248,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       };
       saveChatSession(sessionUpdate);
     }
-  }, [messages, sessionId, user, isSessionLoading, guestId]);
+  }, [messages, sessionId, user, isSessionLoading, guestId, selectedLanguage]);
 
   const initChat = useCallback(() => {
     chatSessionRef.current = createChatSession(
@@ -362,14 +387,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
 
-    // Create session lazily on first real message
-    const currentSessionId = await ensureSessionExists();
+    // Create session lazily on first real message (pass current language)
+    const sessionResult = await ensureSessionExists(selectedLanguage);
 
-    // If session was just created, save the first message immediately
+    // Only save immediately if this is a NEWLY created session
     // (React state update for sessionId may not have completed yet)
-    if (currentSessionId) {
+    // For existing sessions, the regular save effect will handle it
+    if (sessionResult?.isNew) {
       saveChatSession({
-        id: currentSessionId,
+        id: sessionResult.id,
         userId: user?.uid || guestId,
         userEmail: user?.email || null,
         title: `Chat in ${selectedLanguage}`,
