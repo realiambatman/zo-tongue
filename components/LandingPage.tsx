@@ -118,7 +118,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
     setRotationMatrix((prev) => {
       // Apply rotations in world space by pre-multiplying
-      const rotY = createRotationY(-deltaX * sensitivity);
+      const rotY = createRotationY(deltaX * sensitivity);
       const rotX = createRotationX(-deltaY * sensitivity);
       // Order: rotY * rotX * prev (world space rotations)
       return multiplyMatrices(rotY, multiplyMatrices(rotX, prev));
