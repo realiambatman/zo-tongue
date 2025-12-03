@@ -37,6 +37,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isSessionLoading, setIsSessionLoading] = useState(!!initialSessionId);
   const [isAiPaused, setIsAiPaused] = useState(false);
   const [showSignInNudge, setShowSignInNudge] = useState(true);
+  const [sarcasmMode, setSarcasmMode] = useState(false);
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
@@ -74,7 +75,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
             chatSessionRef.current = createChatSession(
               session.language,
-              history
+              history,
+              sarcasmMode
             );
           }
         } catch (error) {
@@ -228,9 +230,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [messages, sessionId, user, isSessionLoading, guestId]);
 
   const initChat = useCallback(() => {
-    chatSessionRef.current = createChatSession(selectedLanguage);
+    chatSessionRef.current = createChatSession(
+      selectedLanguage,
+      undefined,
+      sarcasmMode
+    );
     setMessages([]); // Start with empty chat
-  }, []); // Initial mount only
+  }, [sarcasmMode]); // Reinit when sarcasm changes
+
+  // Handle sarcasm mode toggle
+  const prevSarcasmRef = useRef(false);
+  useEffect(() => {
+    if (prevSarcasmRef.current === sarcasmMode) return;
+
+    const toggleSarcasm = async () => {
+      const systemMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: "model",
+        text: sarcasmMode
+          ? "🙄 Sarcasm mode ON. Brace yourself..."
+          : "Sarcasm mode OFF. Back to being helpful 😇",
+        timestamp: Date.now(),
+        isSystem: true,
+      };
+      setMessages((prev) => [...prev, systemMsg]);
+
+      if (chatSessionRef.current) {
+        try {
+          const currentHistory = await chatSessionRef.current.getHistory();
+          chatSessionRef.current = createChatSession(
+            selectedLanguage,
+            currentHistory,
+            sarcasmMode
+          );
+        } catch (e) {
+          chatSessionRef.current = createChatSession(
+            selectedLanguage,
+            undefined,
+            sarcasmMode
+          );
+        }
+      } else {
+        chatSessionRef.current = createChatSession(
+          selectedLanguage,
+          undefined,
+          sarcasmMode
+        );
+      }
+    };
+
+    toggleSarcasm();
+    prevSarcasmRef.current = sarcasmMode;
+  }, [sarcasmMode, selectedLanguage]);
 
   // Handle language change
   const prevLanguageRef = useRef(selectedLanguage);
@@ -250,27 +301,28 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       };
       setMessages((prev) => [...prev, systemMsg]);
 
-      // Re-initialize session with new language but keep history
+      // Re-initialize with history for context
       if (chatSessionRef.current) {
         try {
-          // We need to cast to any to access getHistory() if it's not in the type definition yet,
-          // or rely on the fact that Chat usually manages its own history internally.
-          // However, since we can't easily extract the history in the exact Content[] format
-          // without using internal properties if getHistory isn't public,
-          // we might need to rely on the SDK documentation.
-          // Assuming standard Google GenAI SDK usage:
           const currentHistory = await chatSessionRef.current.getHistory();
           chatSessionRef.current = createChatSession(
             selectedLanguage,
-            currentHistory
+            currentHistory,
+            sarcasmMode
           );
         } catch (e) {
-          console.error("Failed to preserve history during language switch", e);
-          // Fallback: just create new session without history if extraction fails
-          chatSessionRef.current = createChatSession(selectedLanguage);
+          chatSessionRef.current = createChatSession(
+            selectedLanguage,
+            undefined,
+            sarcasmMode
+          );
         }
       } else {
-        chatSessionRef.current = createChatSession(selectedLanguage);
+        chatSessionRef.current = createChatSession(
+          selectedLanguage,
+          undefined,
+          sarcasmMode
+        );
       }
     };
 
@@ -423,11 +475,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             Speaking: {selectedLanguage}
           </p>
         </div>
-        <div className="w-36">
-          <LanguageSelector
-            selected={selectedLanguage}
-            onChange={setSelectedLanguage}
-          />
+        <div className="flex items-center gap-3">
+          {/* Sarcasm Toggle - Professional Switch */}
+          <div
+            onClick={() => setSarcasmMode(!sarcasmMode)}
+            className="flex items-center gap-2 cursor-pointer group"
+            title={sarcasmMode ? "Turn off sarcasm" : "Turn on sarcasm"}
+          >
+            <span className="text-[11px] font-medium text-ink-muted hidden sm:block">
+              {sarcasmMode ? "Sass" : "Nice"}
+            </span>
+            <div
+              className={`
+              relative w-12 h-6 rounded-full transition-all duration-300 
+              ${
+                sarcasmMode
+                  ? "bg-gradient-to-r from-orange-400 to-amber-500 shadow-[0_0_12px_rgba(251,146,60,0.4)]"
+                  : "bg-slate-200 group-hover:bg-slate-300"
+              }
+            `}
+            >
+              <div
+                className={`
+                absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center text-xs
+                ${
+                  sarcasmMode
+                    ? "left-6 bg-white shadow-md"
+                    : "left-0.5 bg-white shadow-sm"
+                }
+              `}
+              >
+                {sarcasmMode ? "😏" : "😇"}
+              </div>
+            </div>
+          </div>
+          <div className="w-36">
+            <LanguageSelector
+              selected={selectedLanguage}
+              onChange={setSelectedLanguage}
+            />
+          </div>
         </div>
       </header>
 
