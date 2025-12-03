@@ -363,7 +363,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsLoading(true);
 
     // Create session lazily on first real message
-    await ensureSessionExists();
+    const currentSessionId = await ensureSessionExists();
+
+    // If session was just created, save the first message immediately
+    // (React state update for sessionId may not have completed yet)
+    if (currentSessionId) {
+      saveChatSession({
+        id: currentSessionId,
+        userId: user?.uid || guestId,
+        userEmail: user?.email || null,
+        title: `Chat in ${selectedLanguage}`,
+        language: selectedLanguage,
+        startTime: Date.now(),
+        lastUpdated: Date.now(),
+        messages: [userMsg],
+        isAnonymous: !user,
+      });
+    }
 
     // If AI is paused (Admin active), skip generating response
     if (isAiPaused) {
