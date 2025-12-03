@@ -201,8 +201,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               {/* Icon Mark */}
               <div className="relative w-10 h-10 flex items-center justify-center perspective-500 group-hover:scale-110 transition-transform duration-500">
-                {/* Back Glow Layer */}
-                <div className="absolute inset-0 bg-gradient-to-br from-accent to-violet-600 rounded-xl rotate-6 group-hover:rotate-12 transition-transform duration-500 ease-out-expo shadow-lg shadow-indigo-500/20 blur-[1px]"></div>
+                {/* Back Glow Layer - Only visible when scrolled */}
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br from-accent to-violet-600 rounded-xl rotate-6 group-hover:rotate-12 transition-all duration-500 ease-out-expo shadow-lg shadow-indigo-500/20 blur-[1px] ${
+                    isScrolled ? "opacity-100" : "opacity-0"
+                  }`}
+                ></div>
                 {/* Main Block */}
                 <div className="absolute inset-0 bg-ink rounded-xl -rotate-3 group-hover:rotate-0 transition-transform duration-500 ease-out-expo border border-white/10 flex items-center justify-center overflow-hidden">
                   {/* Internal Shine */}
@@ -539,8 +543,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* ========================================
           HERO SECTION - Cinematic & Immersive (Sticky/Fixed for Parallax)
           ======================================== */}
-      <div className="sticky top-0 z-0 w-full h-screen min-h-[700px]">
-        <section className="absolute inset-0 bg-ink overflow-hidden flex flex-col justify-center pt-32">
+      <div className="sticky top-0 z-0 w-full h-[90vh] sm:h-screen min-h-[500px] sm:min-h-[700px]">
+        <section className="absolute inset-0 bg-ink overflow-hidden flex flex-col justify-center pt-15 sm:pt-20 pb-20 sm:pb-0">
           {/* Atmospheric Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Soft gradient orbs - Enhanced for Mobile */}
@@ -565,6 +569,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <span className="font-display text-[25vw] md:text-[18vw] font-bold uppercase tracking-tighter text-white/[0.04] whitespace-nowrap block scale-110 opacity-50 md:opacity-70 animate-pan-x-slow md:animate-none">
                 ZOTONGUE
               </span>
+            </div>
+
+            {/* Scroll Down Indicator */}
+            <div className="absolute bottom-32 left-[44%] md:left-[50%] -translate-x-1/2 flex flex-col items-center gap-2 opacity-60 animate-bounce-slow md:bottom-12">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/50">
+                Scroll
+              </span>
+              <svg
+                className="w-5 h-5 text-white/50"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                />
+              </svg>
             </div>
           </div>
 

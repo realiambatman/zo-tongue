@@ -26,12 +26,24 @@
   }
 
   /* Stagger animation delays */
-  .stagger-1 { animation-delay: 100ms; }
-  .stagger-2 { animation-delay: 200ms; }
-  .stagger-3 { animation-delay: 300ms; }
-  .stagger-4 { animation-delay: 400ms; }
-  .stagger-5 { animation-delay: 500ms; }
-  .stagger-6 { animation-delay: 600ms; }
+  .stagger-1 {
+    animation-delay: 100ms;
+  }
+  .stagger-2 {
+    animation-delay: 200ms;
+  }
+  .stagger-3 {
+    animation-delay: 300ms;
+  }
+  .stagger-4 {
+    animation-delay: 400ms;
+  }
+  .stagger-5 {
+    animation-delay: 500ms;
+  }
+  .stagger-6 {
+    animation-delay: 600ms;
+  }
 
   /* Hide scrollbar utilities */
   .no-scrollbar::-webkit-scrollbar {
@@ -93,8 +105,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Slide in from bottom */
@@ -136,6 +152,25 @@
   }
   100% {
     transform: rotate3d(1, 1, 1, 360deg);
+  }
+}
+
+/* ========================================
+   SCROLL INDICATOR ANIMATION
+   ======================================== */
+.animate-bounce-slow {
+  animation: bounce-slow 2s infinite;
+}
+
+@keyframes bounce-slow {
+  0%,
+  100% {
+    transform: translateY(-25%);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
 }
 
@@ -232,8 +267,12 @@ select:focus {
    ======================================== */
 
 @keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
 .animate-marquee {
