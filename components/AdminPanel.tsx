@@ -11,7 +11,11 @@ import {
 import { ChatMessage, SessionType } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-export const AdminPanel: React.FC = () => {
+interface AdminPanelProps {
+  onBack?: () => void;
+}
+
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const { user } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -180,22 +184,53 @@ export const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-5 px-6 lg:px-8 pb-10">
+    <div className="min-h-screen bg-slate-50 pt-5 px-4 sm:px-6 lg:px-8 pb-10">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-12 flex justify-between items-end">
+        {/* Header - Hidden on mobile when viewing a session */}
+        <div
+          className={`mb-6 lg:mb-12 flex justify-between items-center ${
+            selectedSession ? "hidden lg:flex" : "flex"
+          }`}
+        >
           <div>
-            <h1 className="font-display text-4xl font-bold text-ink mb-2">
+            <h1 className="font-display text-2xl sm:text-4xl font-bold text-ink mb-2">
               System Overview
             </h1>
-            <p className="text-ink-muted font-mono text-xs uppercase tracking-widest">
+            <p className="text-ink-muted font-mono text-[10px] sm:text-xs uppercase tracking-widest">
               Admin Dashboard • {sessions.length} Total Sessions
             </p>
           </div>
+          {/* Mobile close button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="lg:hidden p-2 bg-white rounded-full shadow-sm border border-slate-200 text-slate-500 hover:text-ink transition-colors"
+              title="Close"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[calc(100vh-200px)] min-h-[600px]">
-          {/* Sidebar: Users & Sessions */}
-          <div className="lg:col-span-1 bg-white rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 h-[calc(100vh-140px)] lg:h-[calc(100vh-200px)] min-h-[500px] lg:min-h-[600px]">
+          {/* Sidebar: Users & Sessions - Hidden on mobile when session is selected */}
+          <div
+            className={`lg:col-span-1 bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full ${
+              selectedSession ? "hidden lg:flex" : "flex"
+            }`}
+          >
             {/* Tabs */}
             <div className="flex border-b border-slate-100">
               <button
@@ -341,21 +376,46 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Chat View */}
-          <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full relative">
+          {/* Chat View - Full screen on mobile when session selected */}
+          <div
+            className={`lg:col-span-2 bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full relative ${
+              selectedSession ? "flex" : "hidden lg:flex"
+            }`}
+          >
             {selectedSession ? (
               <>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                  <div>
-                    <h2 className="font-bold text-ink text-lg">
+                <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3">
+                  {/* Back button for mobile */}
+                  <button
+                    onClick={() => setSelectedSession(null)}
+                    className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-ink transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-bold text-ink text-base lg:text-lg truncate">
                       {selectedSession.userEmail || "Guest User"}
                     </h2>
-                    <p className="text-xs text-slate-500 font-mono">
+                    <p className="text-[10px] lg:text-xs text-slate-500 font-mono truncate">
                       ID: {selectedSession.userId} • {selectedSession.language}
+                      {selectedSession.ipAddress &&
+                        ` • IP: ${selectedSession.ipAddress}`}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 lg:gap-4 shrink-0">
                     {(!selectedSession.type ||
                       selectedSession.type === SessionType.CHAT) && (
                       <button
@@ -365,15 +425,13 @@ export const AdminPanel: React.FC = () => {
                             !selectedSession.isAiPaused
                           )
                         }
-                        className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border ${
+                        className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-[9px] lg:text-[10px] font-bold uppercase tracking-wider lg:tracking-widest transition-all border ${
                           selectedSession.isAiPaused
                             ? "bg-white text-ink border-slate-200 hover:bg-slate-50"
                             : "bg-ink text-white border-ink hover:bg-slate-800"
                         }`}
                       >
-                        {selectedSession.isAiPaused
-                          ? "AI Paused"
-                          : "AI Active"}
+                        {selectedSession.isAiPaused ? "AI Off" : "AI On"}
                       </button>
                     )}
                     <span
@@ -392,7 +450,7 @@ export const AdminPanel: React.FC = () => {
                 {/* Messages */}
                 <div
                   ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-6 space-y-6 bg-canvas custom-scrollbar"
+                  className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar"
                 >
                   {selectedSession.messages.map((msg) => {
                     // Admin perspective:
@@ -407,10 +465,10 @@ export const AdminPanel: React.FC = () => {
                           isIncoming ? "justify-start" : "justify-end"
                         }`}
                       >
-                        <div className="flex flex-col max-w-[85%]">
+                        <div className="flex flex-col max-w-[90%] lg:max-w-[85%]">
                           {/* Label */}
                           <span
-                            className={`text-[10px] font-mono uppercase mb-1 ${
+                            className={`text-[9px] lg:text-[10px] font-mono uppercase mb-1 ${
                               isIncoming
                                 ? "text-left text-slate-400"
                                 : "text-right text-accent"
@@ -419,18 +477,18 @@ export const AdminPanel: React.FC = () => {
                             {isIncoming
                               ? "User"
                               : msg.isAdminReply
-                              ? "Admin (You)"
-                              : "AI Model"}
+                              ? "Admin"
+                              : "AI"}
                           </span>
 
                           {/* Bubble */}
                           <div
-                            className={`px-5 py-4 text-sm leading-relaxed shadow-sm ${
+                            className={`px-4 lg:px-5 py-3 lg:py-4 text-sm leading-relaxed shadow-sm ${
                               isIncoming
-                                ? "bg-white border border-slate-200 text-ink rounded-3xl rounded-bl-lg"
+                                ? "bg-white border border-slate-200 text-ink rounded-2xl lg:rounded-3xl rounded-bl-lg"
                                 : msg.isAdminReply
-                                ? "bg-indigo-600 text-white border border-indigo-500 rounded-3xl rounded-br-lg"
-                                : "bg-slate-100 text-ink border border-slate-200 rounded-3xl rounded-br-lg"
+                                ? "bg-indigo-600 text-white border border-indigo-500 rounded-2xl lg:rounded-3xl rounded-br-lg"
+                                : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-br-lg"
                             }`}
                           >
                             {msg.image && (
@@ -469,22 +527,22 @@ export const AdminPanel: React.FC = () => {
                 {/* Reply Input - Only for Chat Sessions */}
                 {(!selectedSession.type ||
                   selectedSession.type === SessionType.CHAT) && (
-                  <div className="p-4 bg-white border-t border-slate-100">
+                  <div className="p-3 lg:p-4 bg-white border-t border-slate-100">
                     <form
                       onSubmit={handleSendReply}
-                      className="flex items-center gap-4"
+                      className="flex items-center gap-2 lg:gap-4"
                     >
                       <input
                         type="text"
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
-                        placeholder="Type a reply as Admin..."
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        placeholder="Reply as Admin..."
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 lg:px-4 py-2.5 lg:py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                       />
                       <button
                         type="submit"
                         disabled={!replyText.trim()}
-                        className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                        className="bg-indigo-600 text-white px-4 lg:px-6 py-2.5 lg:py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
                       >
                         Send
                       </button>
@@ -493,7 +551,7 @@ export const AdminPanel: React.FC = () => {
                 )}
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+              <div className="hidden lg:flex flex-1 flex-col items-center justify-center text-slate-400">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                   <svg
                     className="w-8 h-8 text-slate-300"
@@ -527,7 +585,7 @@ const SessionCard: React.FC<{
 }> = ({ session, isSelected, onClick }) => (
   <div
     onClick={onClick}
-    className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 mb-2 ${
+    className={`p-3 lg:p-4 rounded-xl lg:rounded-2xl cursor-pointer transition-all duration-200 mb-2 active:scale-[0.98] ${
       isSelected
         ? "bg-ink text-white shadow-lg"
         : "bg-white hover:bg-slate-100 text-ink border border-slate-100"
@@ -618,6 +676,29 @@ const SessionCard: React.FC<{
     <div className="font-bold text-sm mb-1 truncate">
       {session.title || "Chat Session"}
     </div>
+    {/* Show IP for guest sessions */}
+    {session.isAnonymous && session.ipAddress && (
+      <div
+        className={`text-[10px] font-mono mb-1 flex items-center gap-1 ${
+          isSelected ? "text-slate-400" : "text-slate-400"
+        }`}
+      >
+        <svg
+          className="w-3 h-3"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+          />
+        </svg>
+        {session.ipAddress}
+      </div>
+    )}
     <div
       className={`text-xs truncate ${
         isSelected ? "text-slate-300" : "text-slate-500"

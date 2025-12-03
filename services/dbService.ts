@@ -27,6 +27,7 @@ export interface ChatSession {
   isAnonymous: boolean;
   isAiPaused?: boolean; // New flag to pause AI responses
   type?: SessionType;
+  ipAddress?: string | null; // IP address for guest tracking
 }
 
 export interface UserProfile {
@@ -80,7 +81,8 @@ export const createNewSession = async (
   userEmail?: string | null,
   isAnonymous: boolean = true,
   type: SessionType = SessionType.CHAT,
-  title?: string
+  title?: string,
+  ipAddress?: string | null
 ): Promise<string> => {
   try {
     const sessionsRef = collection(db, "chats");
@@ -94,6 +96,7 @@ export const createNewSession = async (
       messages: [],
       isAnonymous,
       type,
+      ipAddress: ipAddress || null,
     };
     const docRef = await addDoc(sessionsRef, newSession);
     return docRef.id;
@@ -215,5 +218,20 @@ export const toggleAiPause = async (sessionId: string, isPaused: boolean) => {
   } catch (error) {
     console.error("Error toggling AI pause:", error);
     throw error;
+  }
+};
+
+// Fetch user's public IP address using a free service
+export const fetchUserIP = async (): Promise<string | null> => {
+  try {
+    const response = await fetch("https://api.ipify.org?format=json");
+    if (response.ok) {
+      const data = await response.json();
+      return data.ip;
+    }
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch IP address:", error);
+    return null;
   }
 };

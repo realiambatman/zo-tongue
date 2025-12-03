@@ -49,10 +49,10 @@ const App: React.FC = () => {
                   onSelectSession={handleSessionSelect}
                 />
               )}
-              {activeMode === "ADMIN" && <AdminPanel />}
+              {activeMode === "ADMIN" && <AdminPanel onBack={handleBack} />}
               <button
                 onClick={handleBack}
-                className="fixed top-6 right-6 bg-surface/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-surface text-ink-muted hover:text-ink transition-all duration-300 hover:scale-105 z-[110]"
+                className="hidden lg:flex fixed top-6 right-6 bg-surface/90 backdrop-blur-sm p-3 rounded-full shadow-lg hover:bg-surface text-ink-muted hover:text-ink transition-all duration-300 hover:scale-105 z-[110]"
                 title="Close"
               >
                 <svg

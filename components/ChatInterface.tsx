@@ -12,6 +12,7 @@ import {
   ChatSession,
   getSessionById,
   subscribeToSession,
+  fetchUserIP,
 } from "../services/dbService";
 
 interface ChatInterfaceProps {
@@ -178,15 +179,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       // Create session if we have a user OR a guestId, and no session yet
       const effectiveUserId = user?.uid || guestId;
+      const isGuest = !user;
 
       if (effectiveUserId && !sessionId && !initialSessionId) {
         isCreatingSessionRef.current = true;
         try {
+          // Fetch IP for guest users
+          let ipAddress: string | null = null;
+          if (isGuest) {
+            ipAddress = await fetchUserIP();
+          }
+
           const id = await createNewSession(
             effectiveUserId,
             selectedLanguage,
             user?.email || null,
-            true // Always anonymous if not Google signed in (handled by user check inside createNewSession usually, but here we force it)
+            true, // Always anonymous if not Google signed in
+            undefined, // type (default CHAT)
+            undefined, // title (default)
+            ipAddress // Pass IP for guests
           );
           setSessionId(id);
         } catch (error) {
