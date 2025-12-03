@@ -12,7 +12,6 @@ import { MODEL_NAME } from "../constants";
 const ai = new AIClient({
   apiKey: "REDACTED",
 });
-
 // Optimized for Gemini 3 Pro Preview
 // Reference: https://ai.google.dev/gemini-api/docs/gemini-3
 
