@@ -170,50 +170,46 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return () => unsubscribe();
   }, [sessionId]);
 
-  // Create Firestore session on mount (or when user becomes available) if not loading existing
-  useEffect(() => {
-    const initFirestoreSession = async () => {
-      // Wait for auth to settle to avoid race conditions (null -> user)
-      if (authLoading) return;
+  // Helper to create session lazily (only when first message is sent)
+  const ensureSessionExists = useCallback(async (): Promise<string | null> => {
+    if (sessionId) return sessionId;
+    if (initialSessionId) return initialSessionId;
+    if (isCreatingSessionRef.current) return null;
 
-      // Prevent double creation in Strict Mode or rapid updates
-      if (isCreatingSessionRef.current) return;
+    const effectiveUserId = user?.uid || guestId;
+    if (!effectiveUserId) return null;
 
-      // Create session if we have a user OR a guestId, and no session yet
-      const effectiveUserId = user?.uid || guestId;
+    isCreatingSessionRef.current = true;
+    try {
       const isGuest = !user;
-
-      if (effectiveUserId && !sessionId && !initialSessionId) {
-        isCreatingSessionRef.current = true;
-        try {
-          // Fetch IP for guest users
-          let ipAddress: string | null = null;
-          if (isGuest) {
-            ipAddress = await fetchUserIP();
-          }
-
-          const id = await createNewSession(
-            effectiveUserId,
-            selectedLanguage,
-            user?.email || null,
-            true, // Always anonymous if not Google signed in
-            undefined, // type (default CHAT)
-            undefined, // title (default)
-            ipAddress // Pass IP for guests
-          );
-          setSessionId(id);
-        } catch (error) {
-          console.error("Failed to create firestore session", error);
-          isCreatingSessionRef.current = false; // Allow retry on error
-        }
+      let ipAddress: string | null = null;
+      if (isGuest) {
+        ipAddress = await fetchUserIP();
       }
-    };
-    initFirestoreSession();
-  }, [user, sessionId, guestId, authLoading, initialSessionId]); // Added authLoading and ref logic
 
-  // Save messages to Firestore whenever they change
+      const id = await createNewSession(
+        effectiveUserId,
+        selectedLanguage,
+        user?.email || null,
+        true,
+        undefined,
+        undefined,
+        ipAddress
+      );
+      setSessionId(id);
+      return id;
+    } catch (error) {
+      console.error("Failed to create firestore session", error);
+      isCreatingSessionRef.current = false;
+      return null;
+    }
+  }, [sessionId, initialSessionId, user, guestId, selectedLanguage]);
+
+  // Save messages to Firestore whenever they change (only if there are real messages)
   useEffect(() => {
-    if (sessionId && messages.length > 0 && !isSessionLoading) {
+    // Only save if there are actual user/model messages (not just system messages)
+    const hasRealMessages = messages.some((m) => !m.isSystem);
+    if (sessionId && hasRealMessages && !isSessionLoading) {
       const sessionUpdate: ChatSession = {
         id: sessionId,
         userId: user?.uid || guestId,
@@ -365,6 +361,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
+
+    // Create session lazily on first real message
+    await ensureSessionExists();
 
     // If AI is paused (Admin active), skip generating response
     if (isAiPaused) {

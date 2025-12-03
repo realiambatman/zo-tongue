@@ -11,7 +11,7 @@ interface StudyInterfaceProps {
 }
 
 const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [targetLang, setTargetLang] = useState<SupportedLanguage>(
     SupportedLanguage.Paite
   );
@@ -32,34 +32,32 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
     return newId;
   });
 
-  // Initialize Session
-  useEffect(() => {
-    const initSession = async () => {
-      if (authLoading) return;
-      if (sessionId) return;
-      if (isCreatingSessionRef.current) return;
+  // Helper to create session lazily (only when first study material is generated)
+  const ensureSessionExists = async (): Promise<string | null> => {
+    if (sessionId) return sessionId;
+    if (isCreatingSessionRef.current) return null;
 
-      const effectiveUserId = user?.uid || guestId;
-      if (effectiveUserId) {
-        isCreatingSessionRef.current = true;
-        try {
-          const id = await createNewSession(
-            effectiveUserId,
-            targetLang,
-            user?.email || null,
-            !user,
-            SessionType.STUDY,
-            "Study Session"
-          );
-          setSessionId(id);
-        } catch (e) {
-          console.error("Failed to create study session", e);
-          isCreatingSessionRef.current = false;
-        }
-      }
-    };
-    initSession();
-  }, [user, guestId, authLoading, sessionId]);
+    const effectiveUserId = user?.uid || guestId;
+    if (!effectiveUserId) return null;
+
+    isCreatingSessionRef.current = true;
+    try {
+      const id = await createNewSession(
+        effectiveUserId,
+        targetLang,
+        user?.email || null,
+        !user,
+        SessionType.STUDY,
+        "Study Session"
+      );
+      setSessionId(id);
+      return id;
+    } catch (e) {
+      console.error("Failed to create study session", e);
+      isCreatingSessionRef.current = false;
+      return null;
+    }
+  };
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
@@ -70,23 +68,21 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
     setUsage(null);
 
     try {
-      // Save User Input to DB immediately
-      const timestamp = Date.now();
-      if (sessionId) {
-        await addMessageToSession(sessionId, {
+      const response = await generateStudyMaterial(input, targetLang);
+      setResult(response.data);
+      setUsage(response.usage);
+
+      // Only create session and save if generation was successful
+      const currentSessionId = await ensureSessionExists();
+      if (currentSessionId) {
+        const timestamp = Date.now();
+        await addMessageToSession(currentSessionId, {
           id: timestamp.toString(),
           role: "user",
           text: `[Generate Study Material in ${targetLang}] ${input}`,
           timestamp: timestamp,
         });
-      }
 
-      const response = await generateStudyMaterial(input, targetLang);
-      setResult(response.data);
-      setUsage(response.usage);
-
-      // Save Model Output to DB
-      if (sessionId) {
         // Format Output as Markdown for storage
         const formattedOutput = `**Summary:**\n${
           response.data.summary
@@ -94,7 +90,7 @@ const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
           .map((q, i) => `${i + 1}. ${q.question}\n   *Answer: ${q.answer}*`)
           .join("\n")}`;
 
-        await addMessageToSession(sessionId, {
+        await addMessageToSession(currentSessionId, {
           id: (timestamp + 1).toString(),
           role: "model",
           text: formattedOutput,

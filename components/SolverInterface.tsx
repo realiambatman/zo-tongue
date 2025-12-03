@@ -11,7 +11,7 @@ interface SolverInterfaceProps {
 }
 
 const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const [targetLang, setTargetLang] = useState<SupportedLanguage>(
     SupportedLanguage.Paite
   );
@@ -38,34 +38,32 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     return newId;
   });
 
-  // Initialize Session
-  useEffect(() => {
-    const initSession = async () => {
-      if (authLoading) return;
-      if (sessionId) return;
-      if (isCreatingSessionRef.current) return; // Prevent double creation
+  // Helper to create session lazily (only when first problem is solved)
+  const ensureSessionExists = async (): Promise<string | null> => {
+    if (sessionId) return sessionId;
+    if (isCreatingSessionRef.current) return null;
 
-      const effectiveUserId = user?.uid || guestId;
-      if (effectiveUserId) {
-        isCreatingSessionRef.current = true;
-        try {
-          const id = await createNewSession(
-            effectiveUserId,
-            targetLang,
-            user?.email || null,
-            !user,
-            SessionType.SOLVER,
-            "Solver Session"
-          );
-          setSessionId(id);
-        } catch (e) {
-          console.error("Failed to create solver session", e);
-          isCreatingSessionRef.current = false;
-        }
-      }
-    };
-    initSession();
-  }, [user, guestId, authLoading, sessionId]);
+    const effectiveUserId = user?.uid || guestId;
+    if (!effectiveUserId) return null;
+
+    isCreatingSessionRef.current = true;
+    try {
+      const id = await createNewSession(
+        effectiveUserId,
+        targetLang,
+        user?.email || null,
+        !user,
+        SessionType.SOLVER,
+        "Solver Session"
+      );
+      setSessionId(id);
+      return id;
+    } catch (e) {
+      console.error("Failed to create solver session", e);
+      isCreatingSessionRef.current = false;
+      return null;
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,20 +89,6 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
     setUsage(null);
 
     try {
-      // Save User Input to DB immediately
-      let userMsgId = "";
-      const timestamp = Date.now();
-      if (sessionId) {
-        userMsgId = timestamp.toString();
-        await addMessageToSession(sessionId, {
-          id: userMsgId,
-          role: "user",
-          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
-          // image: image ? `data:${image.mime};base64,${image.data}` : undefined,
-          timestamp: timestamp,
-        });
-      }
-
       const response = await solveMultimodal(
         image?.data || null,
         image?.mime || null,
@@ -114,9 +98,17 @@ const SolverInterface: React.FC<SolverInterfaceProps> = ({ onBack }) => {
       setResult(response.text);
       setUsage(response.usage);
 
-      // Save Model Output to DB
-      if (sessionId) {
-        await addMessageToSession(sessionId, {
+      // Only create session and save if solve was successful
+      const currentSessionId = await ensureSessionExists();
+      if (currentSessionId) {
+        const timestamp = Date.now();
+        await addMessageToSession(currentSessionId, {
+          id: timestamp.toString(),
+          role: "user",
+          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
+          timestamp: timestamp,
+        });
+        await addMessageToSession(currentSessionId, {
           id: (timestamp + 1).toString(),
           role: "model",
           text: response.text,
