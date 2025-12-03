@@ -941,9 +941,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     ></div>
                   </div>
 
-                  {/* Minimal Orbiting Elements */}
-                  <div className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"></div>
-                  <div className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"></div>
+                  {/* Minimal Orbiting Elements - pushed behind cube */}
+                  <div 
+                    className="absolute w-[450px] h-[450px] border border-white/10 rounded-full animate-spin-slow"
+                    style={{ transform: "translateZ(-200px)" }}
+                  ></div>
+                  <div 
+                    className="absolute w-[580px] h-[580px] border border-white/5 rounded-full animate-spin-reverse-slow"
+                    style={{ transform: "translateZ(-200px)" }}
+                  ></div>
                 </div>
               </div>
             </div>
