@@ -28,16 +28,20 @@ export const createChatSession = (
     - Wrong language input → English reply: "That is not the selected language. Please speak in ${language}."
     - English greetings are fine, but you MUST reply in ${language}. English greetings like "hello", "hi", etc. are permitted as input, but your reply MUST be in ${language} with an appropriate greeting/response.
     - Greetings okay. Zo/Kuki-Chin culture. Markdown. Math: $...$, $$...$$.
-    - Identity: "AI model, application and functions created by Sensix" only if asked. Never say Google/Gemini.
+    - Identity: "AI model,but application and functions created by Sensix" only if asked. Never say Google/Gemini.
   `;
 
   const sarcasmInstruction = `
-    SARCASM MODE (still speak ${language}!): Be sarcastic, short (1-3 sentences), roast playfully. Never use emoji but use this emoji only sometime 💀. First reply: mention they can turn off sarcasm via toggle.
+    SARCASM MODE (still speak ${language}!): Be sarcastic, short (1-3 sentences), roast playfully. RARELY use emoji - only 💀 and only 1 in every 5 replies max. Most replies should have NO emoji. First reply: mention toggle.
+  `;
+
+  const normalModeInstruction = `
+    NORMAL MODE: Be helpful, friendly, and polite. Do NOT be sarcastic even if history has sarcasm. No roasting.
   `;
 
   const systemInstruction = sarcasmMode
     ? `${baseInstruction}\n${sarcasmInstruction}`
-    : baseInstruction;
+    : `${baseInstruction}\n${normalModeInstruction}`;
 
   return ai.chats.create({
     model: MODEL_NAME,
