@@ -22,18 +22,71 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  // Use rotation matrix for world-space rotations (avoids gimbal lock)
+  const [rotationMatrix, setRotationMatrix] = useState<number[][]>([
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ]);
   const cubeRef = React.useRef<HTMLDivElement>(null);
   const { user, signInWithGoogle, signOut } = useAuth();
+
+  // Matrix multiplication helper
+  const multiplyMatrices = (a: number[][], b: number[][]): number[][] => {
+    const result: number[][] = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        result[i][j] =
+          a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j];
+      }
+    }
+    return result;
+  };
+
+  // Create rotation matrix for Y axis (horizontal drag - world space)
+  const createRotationY = (angleDeg: number): number[][] => {
+    const rad = (angleDeg * Math.PI) / 180;
+    const c = Math.cos(rad);
+    const s = Math.sin(rad);
+    return [
+      [c, 0, s],
+      [0, 1, 0],
+      [-s, 0, c],
+    ];
+  };
+
+  // Create rotation matrix for X axis (vertical drag - world space)
+  const createRotationX = (angleDeg: number): number[][] => {
+    const rad = (angleDeg * Math.PI) / 180;
+    const c = Math.cos(rad);
+    const s = Math.sin(rad);
+    return [
+      [1, 0, 0],
+      [0, c, -s],
+      [0, s, c],
+    ];
+  };
+
+  // Convert rotation matrix to CSS matrix3d string
+  const toMatrix3d = (m: number[][]): string => {
+    return `matrix3d(${m[0][0]}, ${m[1][0]}, ${m[2][0]}, 0, ${m[0][1]}, ${m[1][1]}, ${m[2][1]}, 0, ${m[0][2]}, ${m[1][2]}, ${m[2][2]}, 0, 0, 0, 0, 1)`;
+  };
 
   // Auto-rotation effect
   useEffect(() => {
     let animationFrameId: number;
     const animate = () => {
       if (!isDragging) {
-        setRotation((prev) => ({ ...prev, y: prev.y + 0.2 }));
+        setRotationMatrix((prev) => {
+          const rotY = createRotationY(0.2);
+          return multiplyMatrices(rotY, prev);
+        });
       }
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -61,10 +114,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const deltaX = clientX - lastMousePos.x;
     const deltaY = clientY - lastMousePos.y;
 
-    setRotation((prev) => ({
-      x: prev.x - deltaY * 0.5,
-      y: prev.y - deltaX * 0.5,
-    }));
+    const sensitivity = 0.5;
+
+    setRotationMatrix((prev) => {
+      // Apply rotations in world space by pre-multiplying
+      const rotY = createRotationY(-deltaX * sensitivity);
+      const rotX = createRotationX(-deltaY * sensitivity);
+      // Order: rotY * rotX * prev (world space rotations)
+      return multiplyMatrices(rotY, multiplyMatrices(rotX, prev));
+    });
 
     setLastMousePos({ x: clientX, y: clientY });
   };
@@ -700,7 +758,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <div
                     className="relative w-full h-full transform-style-3d transition-transform duration-75 ease-linear"
                     style={{
-                      transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+                      transform: toMatrix3d(rotationMatrix),
                     }}
                   >
                     {/* Front - Chat (Abstract Network Bubble) */}
