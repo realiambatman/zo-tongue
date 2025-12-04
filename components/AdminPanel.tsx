@@ -132,15 +132,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
 
   useEffect(() => {
     if (selectedSession) {
-      if (!selectedSession.type || selectedSession.type === SessionType.CHAT) {
-        // Chat: Scroll to bottom to see latest
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      } else {
-        // Solver/Study/Translate: Scroll to top to see Input/Context
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.scrollTop = 0;
+      // Small delay to ensure layout is rendered, especially on mobile
+      const timer = setTimeout(() => {
+        if (
+          !selectedSession.type ||
+          selectedSession.type === SessionType.CHAT
+        ) {
+          // Chat: Scroll to bottom to see latest
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        } else {
+          // Solver/Study/Translate: Scroll to top to see Input/Context
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = 0;
+          }
         }
-      }
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, [selectedSession?.id]); // Only run on session switch, not every message update (to allow manual scrolling)
 
@@ -224,7 +232,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 h-[calc(100vh-140px)] lg:h-[calc(100vh-200px)] min-h-[500px] lg:min-h-[600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 h-[calc(100dvh-120px)] lg:h-[calc(100vh-200px)] min-h-[500px] lg:min-h-[600px]">
           {/* Sidebar: Users & Sessions - Hidden on mobile when session is selected */}
           <div
             className={`lg:col-span-1 bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full ${
@@ -385,7 +393,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
             {selectedSession ? (
               <>
                 {/* Header */}
-                <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3">
+                <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
                   {/* Back button for mobile */}
                   <button
                     onClick={() => setSelectedSession(null)}
@@ -450,7 +458,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                 {/* Messages */}
                 <div
                   ref={messagesContainerRef}
-                  className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar"
+                  className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar min-h-0"
                 >
                   {selectedSession.messages.map((msg) => {
                     // Admin perspective:
@@ -527,7 +535,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                 {/* Reply Input - Only for Chat Sessions */}
                 {(!selectedSession.type ||
                   selectedSession.type === SessionType.CHAT) && (
-                  <div className="p-3 lg:p-4 bg-white border-t border-slate-100">
+                  <div className="p-3 lg:p-4 bg-white border-t border-slate-100 shrink-0">
                     <form
                       onSubmit={handleSendReply}
                       className="flex items-center gap-2 lg:gap-4"
