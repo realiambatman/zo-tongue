@@ -602,8 +602,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* ========================================
           HERO SECTION - Cinematic & Immersive (Sticky/Fixed for Parallax)
           ======================================== */}
-      <div className="sticky top-0 z-0 w-full h-[90vh] sm:h-screen min-h-[500px] sm:min-h-[700px]">
-        <section className="absolute inset-0 bg-ink overflow-hidden flex flex-col justify-center pt-15 sm:pt-20 pb-20 sm:pb-0">
+      <div className="sticky top-0 z-0 w-full h-[100dvh] sm:h-screen min-h-[600px] sm:min-h-[700px]">
+        <section className="absolute inset-0 bg-ink overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-0">
           {/* Atmospheric Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Soft gradient orbs - Enhanced for Mobile */}
@@ -625,7 +625,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             {/* Large Decorative Text - Hero Background - Animated on Mobile */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none select-none overflow-hidden w-full">
-              <span className="font-display text-[25vw] md:text-[18vw] font-bold uppercase tracking-tighter text-white/[0.04] whitespace-nowrap block scale-110 opacity-50 md:opacity-70 animate-pan-x-slow md:animate-none">
+              <span className="font-display text-[20vw] sm:text-[25vw] md:text-[18vw] font-bold uppercase tracking-tighter text-white/[0.03] sm:text-white/[0.04] whitespace-nowrap block scale-110 opacity-40 sm:opacity-50 md:opacity-70 animate-pan-x-slow md:animate-none">
                 ZOTONGUE
               </span>
             </div>
@@ -651,11 +651,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          <div className="relative max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 pt-12 pb-12 lg:pt-32 lg:pb-40 w-full">
-            <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-8 lg:mb-0">
+          <div className="relative max-w-[1400px] mx-auto px-6 sm:px-6 lg:px-12 pt-0 pb-0 lg:pt-32 lg:pb-40 w-full">
+            <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-16 mb-0 lg:mb-0">
               {/* Text Content */}
               <div
-                className={`w-full lg:w-1/2 text-center lg:text-left transition-all duration-1000 ${
+                className={`w-full lg:w-1/2 text-center lg:text-left transition-all duration-1000 space-y-4 sm:space-y-0 ${
                   isLoaded
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-8"
@@ -663,7 +663,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               >
                 {/* Main Headline - Large, Bold, Swiss Style */}
                 <h1
-                  className="font-display text-[15vw] sm:text-[13vw] md:text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.85] lg:leading-[0.75] uppercase text-white mb-6 md:mb-8 mix-blend-overlay"
+                  className="font-display text-[12vw] sm:text-[11vw] md:text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.95] sm:leading-[0.85] lg:leading-[0.75] uppercase text-white mb-4 sm:mb-6 md:mb-8 mix-blend-overlay"
                   style={staggerDelay(1)}
                 >
                   Master
@@ -677,7 +677,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 {/* Subtitle - Adjusted for Swiss Grid alignment */}
                 <p
-                  className="text-base sm:text-lg lg:text-xl text-slate-300 md:text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-8 md:mb-12 border-l-0 md:border-l border-slate-800 pl-0 md:pl-6 text-center md:text-left"
+                  className="text-sm sm:text-base lg:text-xl text-slate-300 md:text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-6 sm:mb-8 md:mb-12 border-l-0 md:border-l border-slate-800 pl-0 md:pl-6 text-center md:text-left px-2 sm:px-0"
                   style={staggerDelay(2)}
                 >
                   The most advanced AI platform for the Zo language family.
@@ -687,12 +687,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                 {/* CTA Buttons */}
                 <div
-                  className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4 w-full sm:w-auto px-4 sm:px-0"
+                  className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3 w-full sm:w-auto px-2 sm:px-0"
                   style={staggerDelay(3)}
                 >
                   <button
                     onClick={() => onNavigate(AppMode.CHAT)}
-                    className="group w-full sm:w-auto px-8 py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
                   >
                     Start Chatting
                     <svg
@@ -711,7 +711,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </button>
                   <button
                     onClick={() => onNavigate(AppMode.SOLVER)}
-                    className="group w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-full font-semibold text-sm hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2"
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-full font-semibold text-sm hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2"
                   >
                     <svg
                       className="w-4 h-4 text-violet-300"
@@ -941,7 +941,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       }}
                     ></div>
                   </div>
-
                 </div>
 
                 {/* Minimal Orbiting Elements - outside 3D context, always behind */}
