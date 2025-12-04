@@ -31,7 +31,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   );
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Admin check: Allow access if email ends with @buildnbit.com
   const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
@@ -138,8 +137,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           !selectedSession.type ||
           selectedSession.type === SessionType.CHAT
         ) {
-          // Chat: Scroll to bottom to see latest
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          // Chat: Scroll messages container to bottom
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+              top: messagesContainerRef.current.scrollHeight,
+              behavior: "smooth",
+            });
+          }
         } else {
           // Solver/Study/Translate: Scroll to top to see Input/Context
           if (messagesContainerRef.current) {
@@ -158,7 +162,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       selectedSession &&
       (!selectedSession.type || selectedSession.type === SessionType.CHAT)
     ) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      // Scroll the container, not the element itself
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
     }
   }, [selectedSession?.messages.length]); // Trigger on message count change
 
@@ -192,11 +202,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-5 px-4 sm:px-6 lg:px-8 pb-10">
-      <div className="max-w-7xl mx-auto">
+    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
+      <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
         {/* Header - Hidden on mobile when viewing a session */}
         <div
-          className={`mb-6 lg:mb-12 flex justify-between items-center ${
+          className={`py-5 lg:py-8 flex justify-between items-center shrink-0 ${
             selectedSession ? "hidden lg:flex" : "flex"
           }`}
         >
@@ -232,7 +242,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 h-[calc(100dvh-120px)] lg:h-[calc(100vh-200px)] min-h-[500px] lg:min-h-[600px]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8">
           {/* Sidebar: Users & Sessions - Hidden on mobile when session is selected */}
           <div
             className={`lg:col-span-1 bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full ${
@@ -529,7 +539,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                       </div>
                     );
                   })}
-                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Reply Input - Only for Chat Sessions */}
