@@ -1,7 +1,36 @@
 import { SupportedLanguage, StudyData } from "../types";
 
 // Backend API base URL - adjust this based on your deployment
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api/gemini";
+// In production, set VITE_API_URL environment variable to your backend URL
+// Example: VITE_API_URL=https://api.sensix.gensifts.com/api/gemini
+// Or if backend is on same domain: VITE_API_URL=/api/gemini
+const getApiBaseUrl = () => {
+  // Use environment variable if set
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  // In production (not localhost), try to use same origin
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    // Production: use same origin (assumes backend is proxied on same domain)
+    // If backend is on different domain/port, you MUST set VITE_API_URL
+    const productionUrl = `${window.location.origin}/api/gemini`;
+    console.log(`Using production API URL: ${productionUrl}`);
+    console.warn(
+      "If backend is on different domain, set VITE_API_URL environment variable"
+    );
+    return productionUrl;
+  }
+
+  // Development: default to localhost
+  return "http://localhost:3001/api/gemini";
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface ChatHistoryItem {
   role: "user" | "model";
@@ -36,7 +65,9 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(error.error || "Failed to send message");
     }
 
@@ -64,7 +95,9 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(error.error || "Failed to translate text");
     }
 
@@ -90,7 +123,9 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(error.error || "Failed to generate study material");
     }
 
@@ -120,11 +155,12 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "Unknown error" }));
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
       throw new Error(error.error || "Failed to solve problem");
     }
 
     return response.json();
   },
 };
-
