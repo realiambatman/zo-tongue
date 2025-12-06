@@ -435,12 +435,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
       for await (const chunk of resultStream) {
         const chunkText = chunk.text || ""; // Safely access text
-        fullResponseText += chunkText;
+
+        // Accumulate chunks (generator now yields only new characters)
+        if (chunkText) {
+          fullResponseText += chunkText;
+        }
 
         if (chunk.usageMetadata) {
           finalUsage = chunk.usageMetadata;
         }
 
+        // Update the message with accumulated text
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === botMsgId ? { ...msg, text: fullResponseText } : msg
