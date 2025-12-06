@@ -2,8 +2,8 @@ import { SupportedLanguage, StudyData } from "../types";
 
 // Backend API base URL - adjust this based on your deployment
 // In production, set VITE_API_URL environment variable to your backend URL
-// Example: VITE_API_URL=https://api.sensix.gensifts.com/api/gemini
-// Or if backend is on same domain: VITE_API_URL=/api/gemini
+// Example: VITE_API_URL=https://api.sensix.gensifts.com/api/chat
+// Or if backend is on same domain: VITE_API_URL=/api/chat
 const getApiBaseUrl = () => {
   // Use environment variable if set
   if (import.meta.env.VITE_API_URL) {
@@ -18,7 +18,7 @@ const getApiBaseUrl = () => {
   ) {
     // Production: use same origin (assumes backend is proxied on same domain)
     // If backend is on different domain/port, you MUST set VITE_API_URL
-    const productionUrl = `${window.location.origin}/api/gemini`;
+    const productionUrl = `${window.location.origin}/api/chat`;
     console.log(`Using production API URL: ${productionUrl}`);
     console.warn(
       "If backend is on different domain, set VITE_API_URL environment variable"
@@ -27,7 +27,7 @@ const getApiBaseUrl = () => {
   }
 
   // Development: default to localhost
-  return "http://localhost:3001/api/gemini";
+  return "http://localhost:3001/api/chat";
 };
 
 const API_BASE_URL = getApiBaseUrl();
