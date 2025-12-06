@@ -10,17 +10,8 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
     },
     plugins: [react()],
-    define: {
-      "process.env.API_KEY": JSON.stringify(
-        env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY
-      ),
-      "process.env.GEMINI_API_KEY": JSON.stringify(
-        env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY
-      ),
-      "import.meta.env.VITE_GEMINI_API_KEY": JSON.stringify(
-        env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY
-      ),
-    },
+    // SECURITY: Removed GEMINI_API_KEY injection - API keys should NEVER be in frontend
+    // All Gemini API calls now go through the secure backend server
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),

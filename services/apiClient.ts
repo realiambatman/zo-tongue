@@ -19,10 +19,13 @@ const getApiBaseUrl = () => {
     // Production: use same origin (assumes backend is proxied on same domain)
     // If backend is on different domain/port, you MUST set VITE_API_URL
     const productionUrl = `${window.location.origin}/api/chat`;
-    console.log(`Using production API URL: ${productionUrl}`);
-    console.warn(
-      "If backend is on different domain, set VITE_API_URL environment variable"
-    );
+    // SECURITY: Only log in development
+    if (import.meta.env.DEV) {
+      console.log(`Using production API URL: ${productionUrl}`);
+      console.warn(
+        "If backend is on different domain, set VITE_API_URL environment variable"
+      );
+    }
     return productionUrl;
   }
 
