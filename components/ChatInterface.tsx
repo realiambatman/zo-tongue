@@ -518,8 +518,23 @@ export const ChatInterface: React.FC = () => {
     }
   };
 
+  // Prevent body scroll on mount
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    document.body.style.height = "100svh";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.height = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    };
+  }, []);
+
   return (
-    <div className="h-[100svh] h-screen bg-slate-50 px-2 sm:px-4 lg:px-8 flex flex-col overflow-hidden relative">
+    <div className="fixed inset-0 bg-slate-50 px-2 sm:px-4 lg:px-8 flex flex-col overflow-hidden">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full min-h-0">
         <div
           className={`grid grid-cols-1 ${
