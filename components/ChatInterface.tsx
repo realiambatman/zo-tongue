@@ -519,14 +519,14 @@ export const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden relative">
+    <div className="h-screen h-[100svh] sm:h-[100dvh] bg-slate-50 px-2 sm:px-4 lg:px-8 flex flex-col overflow-hidden relative">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full min-h-0">
         <div
           className={`grid grid-cols-1 ${
             isSidebarOpen && isDesktopSidebarCollapsed
               ? "lg:grid-cols-[64px_1fr]"
               : "lg:grid-cols-4"
-          } gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8`}
+          } gap-2 sm:gap-4 lg:gap-8 flex-1 min-h-0 pb-2 sm:pb-4 lg:pb-8`}
         >
           {/* Mobile Backdrop */}
           {isSidebarOpen && (

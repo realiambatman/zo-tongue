@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { SignInModal } from "./SignInModal";
+import { useAuth } from "../contexts/AuthContext";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -10,11 +11,17 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
+  const { user, signOut } = useAuth();
   const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isLandingPage = location.pathname === "/";
+
+  // Helper to check if user is admin (matches AdminPanel logic)
+  const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
+  // Helper to check if user is a registered user (not anonymous)
+  const isRegistered = user && !user.isAnonymous;
 
   useEffect(() => {
     if (!isLandingPage) {
@@ -228,21 +235,72 @@ export const Navbar: React.FC = () => {
                   </div>
                 );
               })}
+              {isAdmin && (
+                <div className="relative group">
+                  <a
+                    href="/admin"
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer",
+                      location.pathname === "/admin"
+                        ? "bg-white text-ink shadow-sm ring-1 ring-black/5"
+                        : "text-slate-600 hover:text-ink hover:bg-white/50"
+                    )}
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
+                    </svg>
+                    Admin
+                  </a>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 shadow-lg">
+                    Admin dashboard
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-900 rotate-45"></div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="hidden md:flex items-center gap-3">
-              <button
-                onClick={() => setIsSignInModalOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => setIsSignInModalOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 shadow-lg bg-ink text-white hover:bg-slate-800"
-              >
-                Get Started
-              </button>
+              {isRegistered ? (
+                <>
+                  <Link
+                    to="/profile"
+                    className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 shadow-lg bg-ink text-white hover:bg-slate-800"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setIsSignInModalOpen(true)}
+                    className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => setIsSignInModalOpen(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 shadow-lg bg-ink text-white hover:bg-slate-800"
+                  >
+                    Get Started
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button (Hamburger) */}
@@ -358,18 +416,53 @@ export const Navbar: React.FC = () => {
                   </a>
                 );
               })}
+              {isAdmin && (
+                <a
+                  href="/admin"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "text-left font-display text-2xl font-bold transition-colors",
+                    location.pathname === "/admin"
+                      ? "text-ink"
+                      : "text-slate-600 hover:text-ink"
+                  )}
+                >
+                  Admin
+                </a>
+              )}
             </div>
 
             <div className="mt-auto pt-8 border-t border-slate-100 flex flex-col gap-4">
-              <button
-                onClick={() => {
-                  setIsSignInModalOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full bg-ink text-white px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition-all"
-              >
-                Sign In
-              </button>
+              {isRegistered ? (
+                <>
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="w-full bg-white text-ink border border-slate-300 px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-50 transition-all text-center"
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full bg-ink text-white px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition-all"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setIsSignInModalOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-ink text-white px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition-all"
+                >
+                  Sign In
+                </button>
+              )}
             </div>
           </div>
         </div>
