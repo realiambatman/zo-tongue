@@ -2,28 +2,27 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChatMessage, SupportedLanguage } from "../types";
 import { createChatSession } from "../services/geminiService";
 import { LanguageSelector } from "./LanguageSelector";
-import { INITIAL_CHAT_MESSAGE } from "../constants";
 import { Chat, Content } from "@google/genai";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createNewSession,
   saveChatSession,
-  ChatSession,
   getSessionById,
+  getUserSessions,
   subscribeToSession,
   fetchUserIP,
+  ChatSession,
 } from "../services/dbService";
 
-interface ChatInterfaceProps {
-  onBack: () => void;
-  initialSessionId?: string | null;
-}
+import { useParams, useNavigate } from "react-router-dom";
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({
-  onBack,
-  initialSessionId,
-}) => {
+// ... imports remain the same
+
+export const ChatInterface: React.FC = () => {
+  const { sessionId: routeSessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+
   const { user, signInWithGoogle, loading: authLoading } = useAuth();
   const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>(
     SupportedLanguage.Paite
@@ -31,13 +30,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Use route param if available, otherwise null (new session)
   const [sessionId, setSessionId] = useState<string | null>(
-    initialSessionId || null
+    routeSessionId || null
   );
-  const [isSessionLoading, setIsSessionLoading] = useState(!!initialSessionId);
+  const [isSessionLoading, setIsSessionLoading] = useState(!!routeSessionId);
   const [isAiPaused, setIsAiPaused] = useState(false);
   const [showSignInNudge, setShowSignInNudge] = useState(true);
   const [sarcasmMode, setSarcasmMode] = useState(false);
+  const [sidebarSessions, setSidebarSessions] = useState<ChatSession[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open on desktop
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
@@ -55,13 +58,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // Initialize session: Load existing or create new
   useEffect(() => {
     const initSession = async () => {
-      if (initialSessionId) {
+      if (routeSessionId) {
         setIsSessionLoading(true);
         try {
           // Load existing session
-          const session = await getSessionById(initialSessionId);
+          const session = await getSessionById(routeSessionId);
           if (session) {
-            setSessionId(session.id);
             sessionIdRef.current = session.id; // Update ref immediately
             // Important: Set messages first to prevent race conditions with language switch
             setMessages(session.messages);
@@ -97,7 +99,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     };
 
     initSession();
-  }, [initialSessionId]);
+  }, [routeSessionId]);
+
+  // Fetch sessions for sidebar
+  useEffect(() => {
+    const fetchSessions = async () => {
+      if (user) {
+        const sessions = await getUserSessions(user.uid);
+        setSidebarSessions(sessions);
+      } else if (guestId) {
+        // Optional: Implement guest session fetching if needed,
+        // but typically guests only have the current session in memory until saved.
+        // For now, only show sidebar for logged in users or if we save guest sessions to DB.
+        // If we want guests to see history, we need to query by guestId (userId).
+        const sessions = await getUserSessions(guestId);
+        setSidebarSessions(sessions);
+      }
+    };
+    fetchSessions();
+  }, [user, guestId, sessionId]); // Refresh when session changes (e.g. new title/message)
 
   // Real-time subscription to session updates
   const messagesRef = useRef<ChatMessage[]>([]);
@@ -187,7 +207,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       // Use ref to get the most current sessionId value
       if (sessionIdRef.current)
         return { id: sessionIdRef.current, isNew: false };
-      if (initialSessionId) return { id: initialSessionId, isNew: false };
+      if (routeSessionId) return { id: routeSessionId, isNew: false };
       if (isCreatingSessionRef.current) {
         // Wait a bit and check again if session was created
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -226,7 +246,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         isCreatingSessionRef.current = false; // Always reset, success or failure
       }
     },
-    [initialSessionId, user, guestId]
+    [routeSessionId, user, guestId]
   );
 
   // Save messages to Firestore whenever they change (only if there are real messages)
@@ -352,13 +372,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [selectedLanguage]);
 
   useEffect(() => {
-    if (isInitialMount.current && !initialSessionId) {
+    if (isInitialMount.current && !routeSessionId) {
       initChat();
       isInitialMount.current = false;
-    } else if (initialSessionId) {
+    } else if (routeSessionId) {
       isInitialMount.current = false;
     }
-  }, [initChat, initialSessionId]);
+  }, [initChat, routeSessionId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -492,47 +512,178 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-canvas w-full">
-      {/* Header - Clean & Minimal */}
-      <header className="bg-surface border-b border-slate-100 px-5 py-4 flex items-center sticky top-0 z-20 shrink-0">
-        <button
-          onClick={onBack}
-          className="p-2.5 -ml-2 mr-3 rounded-xl text-ink-muted hover:text-ink hover:bg-slate-50 transition-all duration-300"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-        </button>
-        <div className="flex-1">
-          <h2 className="font-display text-lg font-bold text-ink leading-tight">
-            Native Chat
-          </h2>
-          <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
-            Speaking: {selectedLanguage}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Sarcasm Toggle - Professional Switch */}
+    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
+      <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8">
+          {/* Sidebar - Refined Admin Style */}
           <div
-            onClick={() => setSarcasmMode(!sarcasmMode)}
-            className="flex items-center gap-2 cursor-pointer group"
-            title={sarcasmMode ? "Turn off sarcasm" : "Turn on sarcasm"}
+            className={`${
+              isSidebarOpen
+                ? "lg:col-span-1 translate-x-0"
+                : "lg:col-span-0 -translate-x-full opacity-0 hidden"
+            } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full transition-all duration-300 ease-in-out shrink-0 relative z-30`}
           >
-            <span className="text-[11px] font-medium text-ink-muted hidden sm:block">
-              {sarcasmMode ? "Sass" : "Nice"}
-            </span>
-            <div
-              className={`
+            <div className="p-2 lg:p-3 flex-1 overflow-y-auto bg-slate-50/50">
+              <button
+                onClick={() => {
+                  navigate("/chat", { replace: true });
+                  setSessionId(null);
+                  setMessages([]);
+                  chatSessionRef.current = null;
+                }}
+                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                <span className="text-sm font-medium">New chat</span>
+              </button>
+
+              <div className="space-y-2">
+                <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
+                  Recent
+                </h3>
+                {sidebarSessions.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() =>
+                      navigate(`/chat/${session.id}`, { replace: true })
+                    }
+                    className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
+                      sessionId === session.id
+                        ? "bg-ink text-white shadow-lg"
+                        : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
+                    }`}
+                  >
+                    <div className="text-sm truncate w-full font-medium">
+                      {session.title || "New Chat"}
+                    </div>
+                    <div
+                      className={`text-[10px] truncate w-full mt-0.5 ${
+                        sessionId === session.id
+                          ? "text-slate-300"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {new Date(session.lastUpdated).toLocaleDateString()}
+                    </div>
+                  </button>
+                ))}
+                {sidebarSessions.length === 0 && (
+                  <div className="px-3 text-slate-400 text-xs italic">
+                    No history yet
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* User Profile / Lower Sidebar */}
+            <div className="p-3 border-t border-slate-100 bg-white">
+              {user ? (
+                <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
+                  {user.photoURL && (
+                    <img
+                      src={user.photoURL}
+                      className="w-8 h-8 rounded-full border border-slate-200"
+                      alt="User"
+                    />
+                  )}
+                  <div className="flex-1 overflow-hidden">
+                    <div className="text-sm text-ink font-medium truncate">
+                      {user.displayName || "User"}
+                    </div>
+                    <div className="text-xs text-slate-500 truncate">
+                      Free Plan
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => signInWithGoogle()}
+                  className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors w-full text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-ink font-medium">Log in</div>
+                    <div className="text-xs text-slate-500">
+                      Save your chats
+                    </div>
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Main Chat Area */}
+          <div
+            className={`${
+              isSidebarOpen ? "lg:col-span-3" : "lg:col-span-4"
+            } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full relative`}
+          >
+            {/* Header - Admin Style */}
+            <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-ink transition-colors rounded-lg hover:bg-white"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+              <div className="flex-1 min-w-0">
+                <h2 className="font-display text-base lg:text-lg font-bold text-ink truncate">
+                  Native Chat
+                </h2>
+                <p className="font-mono text-[10px] lg:text-xs text-slate-500 font-mono uppercase tracking-widest truncate">
+                  Speaking: {selectedLanguage}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Sarcasm Toggle - Professional Switch */}
+                <div
+                  onClick={() => setSarcasmMode(!sarcasmMode)}
+                  className="flex items-center gap-2 cursor-pointer group"
+                  title={sarcasmMode ? "Turn off sarcasm" : "Turn on sarcasm"}
+                >
+                  <span className="text-[11px] font-medium text-ink-muted hidden sm:block">
+                    {sarcasmMode ? "Sass" : "Nice"}
+                  </span>
+                  <div
+                    className={`
               relative w-12 h-6 rounded-full transition-all duration-300 
               ${
                 sarcasmMode
@@ -540,9 +691,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   : "bg-slate-200 group-hover:bg-slate-300"
               }
             `}
-            >
-              <div
-                className={`
+                  >
+                    <div
+                      className={`
                 absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300 flex items-center justify-center text-xs
                 ${
                   sarcasmMode
@@ -550,195 +701,222 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     : "left-0.5 bg-white shadow-sm"
                 }
               `}
-              >
-                {sarcasmMode ? "😏" : "😇"}
+                    >
+                      {sarcasmMode ? "😏" : "😇"}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-36">
+                  <LanguageSelector
+                    selected={selectedLanguage}
+                    onChange={setSelectedLanguage}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-          <div className="w-36">
-            <LanguageSelector
-              selected={selectedLanguage}
-              onChange={setSelectedLanguage}
-            />
-          </div>
-        </div>
-      </header>
 
-      {/* Sign-in Nudge for Guests */}
-      {user?.isAnonymous && showSignInNudge && (
-        <div className="bg-indigo-50 px-4 py-3 flex items-center justify-between">
-          <p className="text-indigo-900 text-xs font-medium">
-            Sign in to save your chat history permanently.
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => signInWithGoogle()}
-              className="text-indigo-700 hover:text-indigo-900 text-xs font-bold underline"
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => setShowSignInNudge(false)}
-              className="text-indigo-400 hover:text-indigo-600"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
-        {messages.map((msg, index) => {
-          if (msg.isSystem) {
-            return (
-              <div
-                key={msg.id}
-                className="flex w-full justify-center opacity-0 animate-enter"
-                style={{
-                  animationDelay: `${index * 50}ms`,
-                  animationFillMode: "forwards",
-                }}
-              >
-                <span className="px-3 py-1 bg-slate-50 text-ink-muted/60 text-[10px] font-mono uppercase tracking-widest rounded-full border border-slate-100">
-                  {msg.text}
-                </span>
+            {/* Sign-in Nudge for Guests */}
+            {user?.isAnonymous && showSignInNudge && (
+              <div className="bg-indigo-50 px-4 lg:px-6 py-3 flex items-center justify-between border-b border-indigo-100">
+                <p className="text-indigo-900 text-xs font-medium">
+                  Sign in to save your chat history permanently.
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => signInWithGoogle()}
+                    className="text-indigo-700 hover:text-indigo-900 text-xs font-bold underline"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    onClick={() => setShowSignInNudge(false)}
+                    className="text-indigo-400 hover:text-indigo-600"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </div>
-            );
-          }
+            )}
 
-          return (
-            <div
-              key={msg.id}
-              className={`flex w-full opacity-0 animate-enter ${
-                msg.role === "user" ? "justify-end" : "justify-start"
-              }`}
-              style={{
-                animationDelay: `${index * 50}ms`,
-                animationFillMode: "forwards",
-              }}
-            >
-              <div className="flex flex-col max-w-[85%]">
-                <div
-                  className={`
-                  px-5 py-4 text-[15px] leading-relaxed shadow-card
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar min-h-0">
+              {messages.map((msg, index) => {
+                if (msg.isSystem) {
+                  return (
+                    <div
+                      key={msg.id}
+                      className="flex w-full justify-center opacity-0 animate-enter"
+                      style={{
+                        animationDelay: `${index * 50}ms`,
+                        animationFillMode: "forwards",
+                      }}
+                    >
+                      <span className="px-3 py-1 bg-slate-50 text-ink-muted/60 text-[10px] font-mono uppercase tracking-widest rounded-full border border-slate-100">
+                        {msg.text}
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex w-full opacity-0 animate-enter ${
+                      msg.role === "user" ? "justify-end" : "justify-start"
+                    }`}
+                    style={{
+                      animationDelay: `${index * 50}ms`,
+                      animationFillMode: "forwards",
+                    }}
+                  >
+                    <div className="flex flex-col max-w-[90%] lg:max-w-[85%]">
+                      {/* Label */}
+                      <span
+                        className={`text-[9px] lg:text-[10px] font-mono uppercase mb-1 ${
+                          msg.role === "user"
+                            ? "text-right text-slate-400"
+                            : "text-left text-accent"
+                        }`}
+                      >
+                        {msg.role === "user"
+                          ? "You"
+                          : msg.isError
+                          ? "Error"
+                          : "AI"}
+                      </span>
+
+                      {/* Bubble */}
+                      <div
+                        className={`
+                  px-4 lg:px-5 py-3 lg:py-4 text-sm leading-relaxed shadow-sm
                   ${
                     msg.role === "user"
-                      ? "bg-ink text-white rounded-3xl rounded-br-lg user-message-text"
+                      ? "bg-white border border-slate-200 text-ink rounded-2xl lg:rounded-3xl rounded-br-lg"
                       : msg.isError
-                      ? "bg-red-50 text-red-800 border border-red-100 rounded-3xl rounded-bl-lg"
-                      : "bg-surface text-ink border border-slate-100 rounded-3xl rounded-bl-lg"
+                      ? "bg-red-50 text-red-800 border border-red-100 rounded-2xl lg:rounded-3xl rounded-bl-lg"
+                      : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-bl-lg"
                   }
                 `}
-                >
-                  {msg.role === "user" ? (
-                    msg.text
-                  ) : (
-                    <MarkdownRenderer
-                      content={msg.text}
-                      className={msg.isError ? "text-red-800 prose-red" : ""}
-                    />
-                  )}
-                </div>
-                {msg.usage &&
-                  msg.role === "model" &&
-                  !msg.isError &&
-                  !msg.isAdminReply && (
-                    <div className="mt-2 ml-2 font-mono text-[10px] text-ink-muted flex items-center gap-3">
-                      <span>{msg.usage.candidatesTokenCount || 0} output</span>
-                      {msg.usage.thoughtsTokenCount &&
-                        msg.usage.thoughtsTokenCount > 0 && (
-                          <span className="text-accent">
-                            • {msg.usage.thoughtsTokenCount} thoughts
-                          </span>
+                      >
+                        {msg.role === "user" ? (
+                          msg.text
+                        ) : (
+                          <MarkdownRenderer
+                            content={msg.text}
+                            className={
+                              msg.isError ? "text-red-800 prose-red" : ""
+                            }
+                          />
                         )}
-                      {msg.usage.totalTokenCount && (
-                        <span>• {msg.usage.totalTokenCount} total</span>
-                      )}
+                      </div>
+                      <span
+                        className={`text-[10px] text-slate-300 mt-1 px-2 ${
+                          msg.role === "user" ? "text-right" : "text-left"
+                        }`}
+                      >
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true,
+                        })}
+                      </span>
+                      {msg.usage &&
+                        msg.role === "model" &&
+                        !msg.isError &&
+                        !msg.isAdminReply && (
+                          <div className="mt-1 ml-2 font-mono text-[10px] text-slate-400 flex items-center gap-3">
+                            <span>
+                              {msg.usage.candidatesTokenCount || 0} output
+                            </span>
+                            {msg.usage.thoughtsTokenCount &&
+                              msg.usage.thoughtsTokenCount > 0 && (
+                                <span className="text-accent">
+                                  • {msg.usage.thoughtsTokenCount} thoughts
+                                </span>
+                              )}
+                            {msg.usage.totalTokenCount && (
+                              <span>• {msg.usage.totalTokenCount} total</span>
+                            )}
+                          </div>
+                        )}
                     </div>
-                  )}
-              </div>
-            </div>
-          );
-        })}
+                  </div>
+                );
+              })}
 
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex justify-start w-full">
-            <div className="bg-surface border border-slate-100 px-5 py-4 rounded-3xl rounded-bl-lg shadow-card flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div
-                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                ></div>
-                <div
-                  className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                ></div>
-              </div>
+              {/* Loading Indicator */}
+              {isLoading && (
+                <div className="flex justify-start w-full">
+                  <div className="flex flex-col max-w-[90%] lg:max-w-[85%]">
+                    <span className="text-[9px] lg:text-[10px] font-mono uppercase mb-1 text-left text-accent">
+                      AI
+                    </span>
+                    <div className="bg-slate-100 border border-slate-200 px-4 lg:px-5 py-3 lg:py-4 rounded-2xl lg:rounded-3xl rounded-bl-lg shadow-sm flex items-center gap-2">
+                      <div className="flex gap-1.5">
+                        <div
+                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                          style={{ animationDelay: "0ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                          style={{ animationDelay: "150ms" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                          style={{ animationDelay: "300ms" }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area - Admin Style */}
+            <div className="p-3 lg:p-4 bg-white border-t border-slate-100 shrink-0">
+              <form
+                onSubmit={handleSendMessage}
+                className="flex items-center gap-2 lg:gap-4"
+              >
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={`Message in ${selectedLanguage}...`}
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 lg:px-4 py-2.5 lg:py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  disabled={isLoading}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  data-lpignore="true"
+                  data-form-type="other"
+                  name="chat-input"
+                />
+                <button
+                  type="submit"
+                  disabled={isLoading || !inputValue.trim()}
+                  className="bg-indigo-600 text-white px-4 lg:px-6 py-2.5 lg:py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                >
+                  Send
+                </button>
+              </form>
             </div>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Area - Refined */}
-      <div className="p-5 bg-surface border-t border-slate-100 shrink-0">
-        <form
-          onSubmit={handleSendMessage}
-          className="relative flex items-center bg-slate-50 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-accent/20 focus-within:border-accent transition-all duration-300"
-        >
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={`Message in ${selectedLanguage}...`}
-            className="w-full pl-5 pr-14 py-4 bg-transparent border-none focus:ring-0 focus:outline-none text-ink placeholder-ink-muted text-[15px]"
-            disabled={isLoading}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck="false"
-            data-lpignore="true"
-            data-form-type="other"
-            name="chat-input"
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !inputValue.trim()}
-            className="absolute right-2 p-3 bg-ink text-white rounded-xl hover:bg-slate-800 disabled:opacity-40 disabled:bg-slate-300 transition-all duration-300 disabled:cursor-not-allowed"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 12h14M12 5l7 7-7 7"
-              />
-            </svg>
-          </button>
-        </form>
+        </div>
       </div>
     </div>
   );

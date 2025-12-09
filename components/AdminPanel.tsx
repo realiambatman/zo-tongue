@@ -11,11 +11,12 @@ import {
 import { ChatMessage, SessionType } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
-interface AdminPanelProps {
-  onBack?: () => void;
-}
+import { useNavigate } from "react-router-dom";
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
+export const AdminPanel: React.FC = () => {
+  const navigate = useNavigate();
+  const onBack = () => navigate('/');
+
   const { user } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);

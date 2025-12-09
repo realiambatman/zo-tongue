@@ -6,11 +6,14 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 import { useAuth } from "../contexts/AuthContext";
 import { createNewSession, addMessageToSession } from "../services/dbService";
 
-interface StudyInterfaceProps {
-  onBack: () => void;
-}
+import { useNavigate } from "react-router-dom";
 
-const StudyInterface: React.FC<StudyInterfaceProps> = ({ onBack }) => {
+// ... other imports
+
+export const StudyInterface: React.FC = () => {
+    const navigate = useNavigate();
+    const onBack = () => navigate('/');
+
   const { user } = useAuth();
   const [targetLang, setTargetLang] = useState<SupportedLanguage>(
     SupportedLanguage.Paite

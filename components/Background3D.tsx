@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Points, PointMaterial } from "@react-three/drei";
 import * as THREE from "three";
@@ -55,9 +55,29 @@ const ParticleField = (props: any) => {
 };
 
 export const Background3D: React.FC = () => {
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Force immediate initialization on mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) return null;
+
   return (
     <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden mix-blend-multiply">
-      <Canvas camera={{ position: [0, 0, 1] }} gl={{ alpha: true, antialias: true }}>
+      <Canvas
+        camera={{ position: [0, 0, 1] }}
+        gl={{
+          alpha: true,
+          antialias: true,
+          powerPreference: "high-performance",
+          stencil: false,
+          depth: false,
+        }}
+        dpr={[1, 2]}
+        frameloop="always"
+      >
         <ParticleField />
       </Canvas>
     </div>

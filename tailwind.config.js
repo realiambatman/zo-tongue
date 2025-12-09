@@ -11,34 +11,41 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         display: ["Space Grotesk", "system-ui", "sans-serif"],
-        logo: ["Righteous", "cursive"],
+        logo: ["Space Grotesk", "sans-serif"], // Changed from Righteous based on new specs
       },
       colors: {
-        // Canvas - Main page background (never pure white)
+        // Neutral Palette (Slate)
+        slate: {
+          50: "#f8fafc",
+          200: "#e2e8f0",
+          500: "#64748b",
+          900: "#0f172a",
+        },
+        // Brand Colors
+        indigo: {
+          50: "#eef2ff",
+          500: "#6366f1",
+          600: "#4f46e5",
+        },
+        // Semantic Mappings
         canvas: "#f8fafc", // slate-50
-        // Surface - Cards, modals, sticky headers
-        surface: "#ffffff",
-        // Ink Primary - Headings, primary buttons, footers
+        surface: "#ffffff", // white
         ink: {
           DEFAULT: "#0f172a", // slate-900
           muted: "#64748b", // slate-500
         },
-        // Accent - Interactive states, highlights
         accent: {
           DEFAULT: "#4f46e5", // indigo-600
-          hover: "#4338ca", // indigo-700
-          light: "#e0e7ff", // indigo-100
+          hover: "#6366f1", // indigo-500 (Brand Identity/Hover)
+          light: "#eef2ff", // indigo-50
           glow: "rgba(79, 70, 229, 0.2)",
         },
-        // Success
-        success: {
-          DEFAULT: "#059669", // emerald-600
-          light: "#d1fae5", // emerald-100
-        },
+        border: "#e2e8f0", // slate-200
       },
       boxShadow: {
-        card: "0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)",
-        "card-hover": "0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04)",
+        card: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
+        "card-hover": "0 4px 20px -2px rgba(0, 0, 0, 0.05)",
+        // Keep existing glow if needed, or adjust
         glow: "0 0 40px -10px rgba(79, 70, 229, 0.3)",
       },
       borderRadius: {

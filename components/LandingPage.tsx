@@ -1,29 +1,86 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { AppMode } from "../types";
 import { useAuth } from "../contexts/AuthContext";
 import { Background3D } from "./Background3D";
+import { SignInModal } from "./SignInModal";
+// Removed useNavigate import as we use window.location for SSR-like feel
 
-interface LandingPageProps {
-  onNavigate: (mode: AppMode) => void;
-  onProfile: () => void;
-  onAdmin: () => void;
+// RevealText Component for animated text
+interface RevealTextProps {
+  children: React.ReactNode;
+  className?: string;
 }
 
-// Stagger animation helper
-const staggerDelay = (index: number) => ({
-  animationDelay: `${index * 100}ms`,
-});
+const RevealText: React.FC<RevealTextProps> = ({ children, className }) => {
+  return (
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, margin: "-100px" }}
+      variants={{
+        hidden: {},
+        visible: {
+          transition: {
+            staggerChildren: 0.1,
+          },
+        },
+      }}
+      className={className}
+    >
+      <motion.span
+        className="inline-block"
+        variants={{
+          hidden: { opacity: 0, y: 50, rotateX: 20 },
+          visible: {
+            opacity: 1,
+            y: 0,
+            rotateX: 0,
+            transition: { duration: 0.8, ease: [0.2, 0.65, 0.3, 0.9] },
+          },
+        }}
+      >
+        {children}
+      </motion.span>
+    </motion.div>
+  );
+};
 
-export const LandingPage: React.FC<LandingPageProps> = ({
-  onNavigate,
-  onProfile,
-  onAdmin,
-}) => {
+export const LandingPage: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const onProfile = () => (window.location.href = "/profile");
+  const onAdmin = () => (window.location.href = "/admin");
+
+  // Initialize Background3D immediately on page load (hidden but running)
+  const [isBackgroundReady, setIsBackgroundReady] = useState(false);
+  useEffect(() => {
+    // Force Background3D to initialize immediately
+    setIsBackgroundReady(true);
+  }, []);
+
+  // Navigation helper function
+  const onNavigate = (mode: AppMode) => {
+    const routes: Record<AppMode, string> = {
+      [AppMode.CHAT]: "/chat",
+      [AppMode.TRANSLATE]: "/translate",
+      [AppMode.STUDY]: "/study",
+      [AppMode.SOLVER]: "/solver",
+    };
+    window.location.href = routes[mode] || "/chat";
+  };
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
+
+  const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+  const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
   // Use rotation matrix for world-space rotations (avoids gimbal lock)
   // Initial tilt: approximately rotateY(-30deg) * rotateX(-20deg) for a nice angled view
   const [rotationMatrix, setRotationMatrix] = useState<number[][]>([
@@ -134,13 +191,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   useEffect(() => {
     setIsLoaded(true);
-
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Helper to check if user is admin (matches AdminPanel logic)
@@ -240,207 +290,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col">
+    <div ref={containerRef} className="min-h-screen flex flex-col">
       {/* ========================================
           NAVIGATION - Minimal & Clean
           ======================================== */}
-      <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
-            ? "bg-white border-b border-slate-100"
-            : "bg-transparent border-none"
-        }`}
-      >
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div
-              className="flex items-center gap-3 cursor-pointer group"
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            >
-              {/* Icon Mark */}
-              <div className="relative w-10 h-10 flex items-center justify-center perspective-500 group-hover:scale-110 transition-transform duration-500">
-                {/* Back Glow Layer - Only visible when scrolled */}
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br from-accent to-violet-600 rounded-xl rotate-6 group-hover:rotate-12 transition-all duration-500 ease-out-expo shadow-lg shadow-indigo-500/20 blur-[1px] ${
-                    isScrolled ? "opacity-100" : "opacity-0"
-                  }`}
-                ></div>
-                {/* Main Block */}
-                <div className="absolute inset-0 bg-ink rounded-xl -rotate-3 group-hover:rotate-0 transition-transform duration-500 ease-out-expo border border-white/10 flex items-center justify-center overflow-hidden">
-                  {/* Internal Shine */}
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent opacity-50"></div>
-                  {/* The Z - Custom SVG */}
-                  <svg
-                    className="relative z-10 w-6 h-6 text-white drop-shadow-md transform translate-y-[1px]"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M20.5 5H7C5.89543 5 5 5.89543 5 7V7.5C5 8.05228 5.44772 8.5 6 8.5H16.1716L6.29289 18.3787C5.90237 18.7692 6.17905 19.4369 6.73132 19.4369H19.5C20.6046 19.4369 21.5 18.5414 21.5 17.4369V16.9369C21.5 16.3846 21.0523 15.9369 20.5 15.9369H10.3284L20.2071 6.05823C20.5976 5.66771 20.3209 5 19.7687 5H20.5Z"
-                      fill="url(#z-gradient)"
-                    />
-                    <defs>
-                      <linearGradient
-                        id="z-gradient"
-                        x1="5"
-                        y1="5"
-                        x2="21.5"
-                        y2="19.5"
-                        gradientUnits="userSpaceOnUse"
-                      >
-                        <stop stopColor="white" />
-                        <stop offset="1" stopColor="#e2e8f0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
-              </div>
+      {/* Navigation handled by global Layout/Navbar */}
 
-              {/* Logotype */}
-              <div className="flex flex-col">
-                <span
-                  className={`font-display text-xl font-black tracking-tighter leading-none transition-colors duration-300 ${
-                    isScrolled ? "text-ink" : "text-white"
-                  }`}
-                >
-                  ZO
-                  <span
-                    className={`font-medium transition-colors duration-300 ${
-                      isScrolled ? "text-slate-600" : "text-slate-300"
-                    }`}
-                  >
-                    TONGUE
-                  </span>
-                </span>
-                <span className="text-[0.65rem] font-bold uppercase tracking-[0.3em] text-accent leading-none mt-1">
-                  AI Platform
-                </span>
-              </div>
-            </div>
-
-            {/* Desktop Nav Links */}
-            <div className="hidden md:flex items-center gap-8">
-              {isRegistered && (
-                <button
-                  onClick={onProfile}
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    isScrolled
-                      ? "text-ink-muted hover:text-ink"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  Profile
-                </button>
-              )}
-              {isAdmin && (
-                <button
-                  onClick={onAdmin}
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    isScrolled
-                      ? "text-ink-muted hover:text-ink"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  Admin
-                </button>
-              )}
-              <a
-                href="#features"
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  isScrolled
-                    ? "text-ink-muted hover:text-ink"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  isScrolled
-                    ? "text-ink-muted hover:text-ink"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                How it Works
-              </a>
-              <a
-                href="#about"
-                className={`text-sm font-medium transition-colors duration-300 ${
-                  isScrolled
-                    ? "text-ink-muted hover:text-ink"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                About
-              </a>
-              {isRegistered && (
-                <button
-                  onClick={() => signOut()}
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    isScrolled
-                      ? "text-red-500 hover:text-red-600"
-                      : "text-red-400 hover:text-red-300"
-                  }`}
-                >
-                  Sign Out
-                </button>
-              )}
-            </div>
-
-            {/* Desktop CTA */}
-            <div className="hidden md:block">
-              {isRegistered ? (
-                <button
-                  onClick={() => onNavigate(AppMode.CHAT)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                    isScrolled
-                      ? "bg-ink text-white hover:bg-slate-800"
-                      : "bg-white text-ink hover:bg-slate-100"
-                  }`}
-                >
-                  Launch App
-                </button>
-              ) : (
-                <button
-                  onClick={() => signInWithGoogle()}
-                  className={`px-5 py-2.5 rounded-full text-sm font-semibold transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${
-                    isScrolled
-                      ? "bg-ink text-white hover:bg-slate-800"
-                      : "bg-white text-ink hover:bg-slate-100"
-                  }`}
-                >
-                  Sign In
-                </button>
-              )}
-            </div>
-
-            {/* Mobile Menu Button (Hamburger) */}
-            <button
-              className={`md:hidden p-2 ${
-                isScrolled ? "text-ink" : "text-white"
-              }`}
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              </svg>
-            </button>
-          </div>
+      {/* Pre-initialize Background3D (hidden but running) */}
+      {isBackgroundReady && (
+        <div
+          className="fixed inset-0 pointer-events-none opacity-0"
+          style={{ zIndex: -1 }}
+        >
+          <Background3D />
         </div>
-      </nav>
+      )}
 
       {/* Mobile Side Panel (Drawer) */}
       {isMobileMenuOpen && (
@@ -566,7 +430,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <>
                   <button
                     onClick={() => {
-                      onNavigate(AppMode.CHAT);
+                      window.location.href = "/chat";
                       setIsMobileMenuOpen(false);
                     }}
                     className="w-full bg-ink text-white px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition-all"
@@ -586,7 +450,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               ) : (
                 <button
                   onClick={() => {
-                    signInWithGoogle();
+                    setIsSignInModalOpen(true);
                     setIsMobileMenuOpen(false);
                   }}
                   className="w-full bg-ink text-white px-6 py-4 rounded-full text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition-all"
@@ -603,40 +467,45 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           HERO SECTION - Cinematic & Immersive (Sticky/Fixed for Parallax)
           ======================================== */}
       <div className="sticky top-0 z-0 w-full h-[100dvh] sm:h-screen min-h-[600px] sm:min-h-[700px]">
-        <section className="absolute inset-0 bg-ink overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-0">
+        <section className="absolute inset-0 bg-slate-200 overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-24">
           {/* Atmospheric Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Soft gradient orbs - Enhanced for Mobile */}
-            <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/10 blur-[80px] animate-pulse-slow md:bg-accent/5 md:blur-[120px]"></div>
-            <div className="absolute top-1/4 -right-1/4 w-[70%] h-[70%] rounded-full bg-indigo-500/10 blur-[60px] animate-float md:w-[50%] md:h-[50%] md:bg-indigo-400/5 md:blur-[100px]"></div>
-            <div className="absolute -bottom-1/4 left-1/3 w-[60%] h-[60%] rounded-full bg-violet-500/10 blur-[80px] animate-float-delayed md:w-[40%] md:h-[40%] md:bg-violet-500/5"></div>
+            <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/5 blur-[80px] animate-pulse-slow md:bg-accent/3 md:blur-[120px]"></div>
+            <div className="absolute top-1/4 -right-1/4 w-[70%] h-[70%] rounded-full bg-indigo-500/5 blur-[60px] animate-float md:w-[50%] md:h-[50%] md:bg-indigo-400/3 md:blur-[100px]"></div>
+            <div className="absolute -bottom-1/4 left-1/3 w-[60%] h-[60%] rounded-full bg-violet-500/5 blur-[80px] animate-float-delayed md:w-[40%] md:h-[40%] md:bg-violet-500/3"></div>
 
             {/* Mobile Specific Animated Gradient Mesh */}
-            <div className="absolute inset-0 opacity-30 md:hidden bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.2),transparent_70%)] animate-pulse-slow"></div>
+            <div className="absolute inset-0 opacity-20 md:hidden bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.1),transparent_70%)] animate-pulse-slow"></div>
 
             {/* Subtle grid pattern */}
             <div
-              className="absolute inset-0 opacity-[0.05] md:opacity-[0.02]"
+              className="absolute inset-0 opacity-[0.03] md:opacity-[0.02]"
               style={{
-                backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+                backgroundImage: `linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)`,
                 backgroundSize: "40px 40px",
               }}
             ></div>
 
-            {/* Large Decorative Text - Hero Background - Animated on Mobile */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none select-none overflow-hidden w-full">
-              <span className="font-display text-[20vw] sm:text-[25vw] md:text-[18vw] font-bold uppercase tracking-tighter text-white/[0.03] sm:text-white/[0.04] whitespace-nowrap block scale-110 opacity-40 sm:opacity-50 md:opacity-70 animate-pan-x-slow md:animate-none">
+            {/* Large Decorative Text - Hero Background - Animated */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-[0.03]">
+              <h1 className="text-[20vw] sm:text-[25vw] md:text-[18vw] font-display font-bold leading-none tracking-tighter text-slate-900 whitespace-nowrap">
                 ZOTONGUE
-              </span>
+              </h1>
             </div>
 
             {/* Scroll Down Indicator */}
-            <div className="absolute bottom-32 left-[44%] md:left-[50%] -translate-x-1/2 flex flex-col items-center gap-2 opacity-60 animate-bounce-slow md:bottom-12">
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/50">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 0.6, y: 0 }}
+              transition={{ delay: 1.5, duration: 0.8 }}
+              className="absolute bottom-32 left-[44%] md:left-[50%] -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce-slow md:bottom-12"
+            >
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-slate-500">
                 Scroll
               </span>
               <svg
-                className="w-5 h-5 text-white/50"
+                className="w-5 h-5 text-slate-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -648,51 +517,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   d="M19 14l-7 7m0 0l-7-7m7 7V3"
                 />
               </svg>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="relative max-w-[1400px] mx-auto px-6 sm:px-6 lg:px-12 pt-0 pb-0 lg:pt-32 lg:pb-40 w-full">
+          <div className="relative max-w-[1400px] mx-auto px-6 sm:px-6 lg:px-12 pt-0 pb-24 lg:pt-32 lg:pb-40 w-full">
             <div className="flex flex-col lg:flex-row items-center gap-8 sm:gap-10 lg:gap-16 mb-0 lg:mb-0">
               {/* Text Content */}
-              <div
-                className={`w-full lg:w-1/2 text-center lg:text-left transition-all duration-1000 space-y-4 sm:space-y-0 ${
-                  isLoaded
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-8"
-                }`}
-              >
-                {/* Main Headline - Large, Bold, Swiss Style */}
-                <h1
-                  className="font-display text-[12vw] sm:text-[11vw] md:text-[10vw] lg:text-[8vw] font-bold tracking-tighter leading-[0.95] sm:leading-[0.85] lg:leading-[0.75] uppercase text-white mb-4 sm:mb-6 md:mb-8 mix-blend-overlay"
-                  style={staggerDelay(1)}
-                >
+              <div className="w-full lg:w-1/2 text-center lg:text-left space-y-4 sm:space-y-0">
+                {/* Main Headline - Large, Bold, Swiss Style with Animation */}
+                <RevealText className="text-[12vw] sm:text-[11vw] md:text-[10vw] lg:text-[8vw] font-display font-bold tracking-tighter leading-[0.95] sm:leading-[0.85] lg:leading-[0.75] uppercase text-ink mb-4 sm:mb-6 md:mb-8">
                   Master
                   <br />
-                  <span className="text-transparent stroke-text bg-clip-text bg-gradient-to-r from-white via-white/50 to-transparent md:bg-none">
-                    Languages
-                  </span>
+                  <span className="text-accent">Languages</span>
                   <br />
                   Effortlessly
-                </h1>
+                </RevealText>
 
-                {/* Subtitle - Adjusted for Swiss Grid alignment */}
-                <p
-                  className="text-sm sm:text-base lg:text-xl text-slate-300 md:text-slate-400 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-6 sm:mb-8 md:mb-12 border-l-0 md:border-l border-slate-800 pl-0 md:pl-6 text-center md:text-left px-2 sm:px-0"
-                  style={staggerDelay(2)}
+                {/* Subtitle - Adjusted for Swiss Grid alignment with Animation */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8, duration: 0.8 }}
+                  className="flex flex-col md:flex-row gap-8 items-start md:items-center max-w-2xl"
                 >
-                  The most advanced AI platform for the Zo language family.
-                  Seamlessly bridge English with Paite, Thadou, Hmar, Mizo, and
-                  more.
-                </p>
+                  <p className="text-sm sm:text-base lg:text-xl text-slate-600 md:text-slate-700 max-w-md mx-auto lg:mx-0 leading-relaxed font-light mb-6 sm:mb-8 md:mb-12 border-l-0 md:border-l border-slate-300 pl-0 md:pl-6 text-center md:text-left px-2 sm:px-0">
+                    The most advanced AI platform for the Zo language family.
+                    Seamlessly bridge English with Paite, Thadou, Hmar, Mizo,
+                    and more.
+                  </p>
+                </motion.div>
 
                 {/* CTA Buttons */}
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1, duration: 0.8 }}
                   className="flex flex-col sm:flex-row justify-center lg:justify-start gap-3 w-full sm:w-auto px-2 sm:px-0"
-                  style={staggerDelay(3)}
                 >
-                  <button
-                    onClick={() => onNavigate(AppMode.CHAT)}
-                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-ink rounded-full font-semibold text-sm hover:bg-slate-100 transition-all duration-300 hover:shadow-xl hover:shadow-white/10 hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => (window.location.href = "/chat")}
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-ink text-white rounded-full font-semibold text-sm hover:bg-slate-800 transition-all duration-300 hover:shadow-xl hover:shadow-slate-900/10 flex items-center justify-center gap-2"
                   >
                     Start Chatting
                     <svg
@@ -708,13 +574,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         d="M17 8l4 4m0 0l-4 4m4-4H3"
                       />
                     </svg>
-                  </button>
-                  <button
-                    onClick={() => onNavigate(AppMode.SOLVER)}
-                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-full font-semibold text-sm hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2"
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => (window.location.href = "/solver")}
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-slate-100 text-ink border border-slate-200 rounded-full font-semibold text-sm hover:bg-white hover:border-slate-300 transition-all duration-300 flex items-center justify-center gap-2"
                   >
                     <svg
-                      className="w-4 h-4 text-violet-300"
+                      className="w-4 h-4 text-accent"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -733,8 +601,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       />
                     </svg>
                     Visual Solver
-                  </button>
-                </div>
+                  </motion.button>
+                </motion.div>
               </div>
 
               {/* 3D Graphic Element - Refined for Digital Swiss */}
@@ -981,15 +849,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h2>
               <p className="text-xl text-ink-muted font-light leading-relaxed max-w-xl border-l border-slate-200 pl-6">
                 Everything you need to understand, learn, and communicate in
-                Kuki-Chin-Mizo languages.
+                Native languages.
               </p>
             </div>
 
             {/* Features Grid - Asymmetric Magazine Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
               {/* Primary Feature - Chat */}
-              <div
-                onClick={() => onNavigate(AppMode.CHAT)}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => (window.location.href = "/chat")}
                 className="lg:col-span-7 group relative bg-white rounded-[2.5rem] p-10 lg:p-16 overflow-hidden border border-slate-100 shadow-card hover:shadow-2xl transition-all duration-700 ease-out-expo cursor-pointer h-[500px] flex flex-col justify-between"
               >
                 <div className="relative z-10">
@@ -1016,13 +889,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Start Chatting
                   <div className="w-8 h-px bg-ink group-hover:w-16 transition-all duration-500"></div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Secondary Column */}
               <div className="lg:col-span-5 flex flex-col gap-8">
                 {/* Translate Feature */}
-                <div
-                  onClick={() => onNavigate(AppMode.TRANSLATE)}
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.1 }}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => (window.location.href = "/translate")}
                   className="group flex-1 bg-slate-900 rounded-[2.5rem] p-10 border border-slate-800 shadow-card hover:shadow-2xl transition-all duration-500 ease-out-expo cursor-pointer relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 blur-[50px] rounded-full group-hover:bg-accent/20 transition-colors duration-500"></div>
@@ -1041,11 +919,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       Try Now
                     </span>
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Study Feature */}
-                <div
-                  onClick={() => onNavigate(AppMode.STUDY)}
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.8, delay: 0.2 }}
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => (window.location.href = "/study")}
                   className="group flex-1 bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-card hover:shadow-2xl transition-all duration-500 ease-out-expo cursor-pointer relative overflow-hidden"
                 >
                   <div className="relative z-10 h-full flex flex-col justify-center">
@@ -1062,12 +945,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       Learn More
                     </span>
                   </div>
-                </div>
+                </motion.div>
               </div>
 
               {/* Bottom Full Width - Solver */}
-              <div
-                onClick={() => onNavigate(AppMode.SOLVER)}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8, delay: 0.3 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => (window.location.href = "/solver")}
                 className="lg:col-span-12 group relative bg-slate-50 rounded-[2.5rem] p-10 lg:p-14 border border-slate-200 overflow-hidden cursor-pointer hover:bg-white hover:shadow-2xl transition-all duration-700 ease-out-expo flex flex-col md:flex-row items-center gap-10"
               >
                 <div className="md:w-1/2 relative z-10">
@@ -1100,7 +988,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>
@@ -1116,23 +1004,35 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
               {/* Left Content - Sticky Feel */}
               <div className="relative z-10">
-                <div className="inline-flex items-center gap-3 mb-8">
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.6 }}
+                  className="inline-flex items-center gap-3 mb-8"
+                >
                   <span className="w-12 h-px bg-ink"></span>
                   <span className="font-mono text-xs uppercase tracking-[0.2em] text-ink">
                     Workflow
                   </span>
-                </div>
-                <h2 className="font-display text-6xl font-bold text-ink tracking-tighter leading-[0.95] mb-8">
+                </motion.div>
+                <RevealText className="text-6xl font-display font-bold text-ink tracking-tighter leading-[0.95] mb-8">
                   Seamless
                   <br />
                   Integration<span className="text-accent">.</span>
-                </h2>
-                <p className="text-xl text-slate-500 font-light leading-relaxed max-w-md mb-12">
+                </RevealText>
+                <motion.p
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3, duration: 0.8 }}
+                  className="text-xl text-slate-500 font-light leading-relaxed max-w-md mb-12"
+                >
                   Designed for instant utility. No complex setups, just pure
                   linguistic power at your fingertips.
-                </p>
+                </motion.p>
                 <button
-                  onClick={() => onNavigate(AppMode.CHAT)}
+                  onClick={() => (window.location.href = "/chat")}
                   className="group bg-slate-50 border border-slate-200 text-ink px-8 py-4 rounded-full font-semibold text-sm hover:bg-ink hover:text-white hover:border-ink transition-all duration-300 flex items-center gap-2"
                 >
                   Try it Now
@@ -1174,8 +1074,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     desc: "Get AI-powered insights in seconds.",
                   },
                 ].map((step, i) => (
-                  <div
+                  <motion.div
                     key={i}
+                    initial={{ opacity: 0, x: 30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.6, delay: i * 0.1 }}
                     className="relative z-10 group bg-white p-8 rounded-3xl border border-slate-100 shadow-sm hover:shadow-card-hover hover:border-slate-200 hover:-translate-x-2 transition-all duration-500 cursor-default flex items-center gap-6"
                   >
                     <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 group-hover:bg-ink group-hover:border-ink transition-colors duration-500">
@@ -1191,7 +1095,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         {step.desc}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </div>
@@ -1221,8 +1125,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div>
                 <h4 className="font-bold text-ink mb-4">Community First</h4>
                 <p className="text-slate-500 text-sm leading-relaxed">
-                  Built specifically for Kuki-Chin-Mizo dialects, ensuring
-                  cultural nuance is never lost in translation.
+                  Built specifically for Native dialects, ensuring cultural
+                  nuance is never lost in translation.
                 </p>
               </div>
               <div>
@@ -1394,31 +1298,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
           </div>
-
-          {/* Bottom - Meta */}
-          <div className="border-t border-slate-800 bg-black/20 pb-8 md:pb-0">
-            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12 py-6 flex flex-col md:flex-row justify-between items-center gap-4">
-              <div className="text-slate-500 text-xs font-mono uppercase tracking-wider">
-                © 2024 ZoTongue AI.
-              </div>
-              <div className="flex gap-6">
-                <a
-                  href="#"
-                  className="text-slate-500 hover:text-white text-xs font-mono uppercase tracking-wider transition-colors"
-                >
-                  Privacy
-                </a>
-                <a
-                  href="#"
-                  className="text-slate-500 hover:text-white text-xs font-mono uppercase tracking-wider transition-colors"
-                >
-                  Terms
-                </a>
-              </div>
-            </div>
-          </div>
         </footer>
       </div>
+
+      {/* Sign In Modal */}
+      <SignInModal
+        isOpen={isSignInModalOpen}
+        onClose={() => setIsSignInModalOpen(false)}
+      />
     </div>
   );
 };

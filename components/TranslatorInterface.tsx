@@ -5,13 +5,14 @@ import { LanguageSelector } from "./LanguageSelector";
 import { useAuth } from "../contexts/AuthContext";
 import { createNewSession, addMessageToSession } from "../services/dbService";
 
-interface TranslatorInterfaceProps {
-  onBack: () => void;
-}
+import { useNavigate } from "react-router-dom";
 
-const TranslatorInterface: React.FC<TranslatorInterfaceProps> = ({
-  onBack,
-}) => {
+// ... other imports
+
+export const TranslatorInterface: React.FC = () => {
+  const navigate = useNavigate();
+  const onBack = () => navigate('/');
+
   const { user } = useAuth();
   const [sourceLang, setSourceLang] = useState<SupportedLanguage>(
     SupportedLanguage.Paite

@@ -13,7 +13,3 @@ export const LANGUAGE_OPTIONS: SupportedLanguage[] = [
 ];
 
 export const MODEL_NAME = "gemini-3-pro-preview";
-
-export const INITIAL_CHAT_MESSAGE = (lang: SupportedLanguage): string => {
-  return `Chibai! I am your ${lang} assistant. I will only speak in ${lang}.`;
-};

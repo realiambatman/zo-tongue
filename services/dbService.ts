@@ -9,6 +9,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   onSnapshot,
   Unsubscribe,
 } from "firebase/firestore";
@@ -72,6 +73,15 @@ export const saveChatSession = async (session: ChatSession) => {
     );
   } catch (error) {
     console.error("Error saving chat session:", error);
+  }
+};
+
+export const deleteChatSession = async (sessionId: string) => {
+  try {
+    await deleteDoc(doc(db, "chats", sessionId));
+  } catch (error) {
+    console.error("Error deleting chat session:", error);
+    throw error;
   }
 };
 

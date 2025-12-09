@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getUserSessions, ChatSession } from "../services/dbService";
-import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ProfilePageProps {
-  onNavigate: (mode: string) => void;
+  onNavigate?: (mode: string) => void;
   onSelectSession?: (sessionId: string) => void;
 }
 
@@ -12,6 +11,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onNavigate,
   onSelectSession,
 }) => {
+  // Default navigation handler if not provided
+  const handleNavigate = (mode: string) => {
+    if (onNavigate) {
+      onNavigate(mode);
+    } else {
+      const routes: Record<string, string> = {
+        CHAT: "/chat",
+        TRANSLATE: "/translate",
+        STUDY: "/study",
+        SOLVER: "/solver",
+      };
+      window.location.href = routes[mode] || "/chat";
+    }
+  };
   const { user, signInWithGoogle } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +74,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="text-center py-20 border border-dashed border-slate-200 rounded-3xl bg-slate-50">
             <p className="text-ink-muted font-light">No chat history found.</p>
             <button
-              onClick={() => onNavigate("CHAT")}
+              onClick={() => handleNavigate("CHAT")}
               className="mt-4 text-accent font-mono text-xs uppercase tracking-widest hover:underline"
             >
               Start a new conversation
