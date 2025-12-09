@@ -70,6 +70,7 @@ export const ChatInterface: React.FC = () => {
           const session = await getSessionById(routeSessionId);
           if (session) {
             sessionIdRef.current = session.id; // Update ref immediately
+            setSessionId(session.id); // Update state for active tab highlighting
             // Important: Set messages first to prevent race conditions with language switch
             setMessages(session.messages);
             setSelectedLanguage(session.language);
@@ -94,6 +95,12 @@ export const ChatInterface: React.FC = () => {
           setIsSessionLoading(false);
         }
         return;
+      }
+
+      // Clear sessionId when navigating to new chat (no route param)
+      if (!routeSessionId) {
+        setSessionId(null);
+        sessionIdRef.current = null;
       }
 
       // Default initialization - collapse sidebar for new chats too
@@ -633,81 +640,80 @@ export const ChatInterface: React.FC = () => {
                 </button>
               </div>
 
-              {!isDesktopSidebarCollapsed && (
-                <>
-                  <button
-                    onClick={() => {
-                      navigate("/chat", { replace: true });
-                      setSessionId(null);
-                      setMessages([]);
-                      chatSessionRef.current = null;
-                      setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
-                      // Only close on mobile, keep open on desktop
-                      if (window.innerWidth < 1024) {
-                        setIsSidebarOpen(false);
-                      }
-                    }}
-                    className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
+              {/* Show content on mobile when sidebar is open, or on desktop when not collapsed */}
+              <div className={isDesktopSidebarCollapsed ? "lg:hidden" : ""}>
+                <button
+                  onClick={() => {
+                    navigate("/chat", { replace: true });
+                    setSessionId(null);
+                    setMessages([]);
+                    chatSessionRef.current = null;
+                    setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
+                    // Only close on mobile, keep open on desktop
+                    if (window.innerWidth < 1024) {
+                      setIsSidebarOpen(false);
+                    }
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <span className="text-sm font-medium">New chat</span>
-                  </button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium">New chat</span>
+                </button>
 
-                  <div className="space-y-2">
-                    <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
-                      Recent
-                    </h3>
-                    {sidebarSessions.map((session) => (
-                      <button
-                        key={session.id}
-                        onClick={() => {
-                          navigate(`/chat/${session.id}`, { replace: true });
-                          setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
-                          // Only close on mobile, keep open on desktop
-                          if (window.innerWidth < 1024) {
-                            setIsSidebarOpen(false);
-                          }
-                        }}
-                        className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
+                <div className="space-y-2">
+                  <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
+                    Recent
+                  </h3>
+                  {sidebarSessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => {
+                        navigate(`/chat/${session.id}`, { replace: true });
+                        setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
+                        // Only close on mobile, keep open on desktop
+                        if (window.innerWidth < 1024) {
+                          setIsSidebarOpen(false);
+                        }
+                      }}
+                      className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
+                        sessionId === session.id
+                          ? "bg-ink text-white shadow-lg"
+                          : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="text-sm truncate w-full font-medium">
+                        {session.title || "New Chat"}
+                      </div>
+                      <div
+                        className={`text-[10px] truncate w-full mt-0.5 ${
                           sessionId === session.id
-                            ? "bg-ink text-white shadow-lg"
-                            : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
+                            ? "text-slate-300"
+                            : "text-slate-400"
                         }`}
                       >
-                        <div className="text-sm truncate w-full font-medium">
-                          {session.title || "New Chat"}
-                        </div>
-                        <div
-                          className={`text-[10px] truncate w-full mt-0.5 ${
-                            sessionId === session.id
-                              ? "text-slate-300"
-                              : "text-slate-400"
-                          }`}
-                        >
-                          {new Date(session.lastUpdated).toLocaleDateString()}
-                        </div>
-                      </button>
-                    ))}
-                    {sidebarSessions.length === 0 && (
-                      <div className="px-3 text-slate-400 text-xs italic">
-                        No history yet
+                        {new Date(session.lastUpdated).toLocaleDateString()}
                       </div>
-                    )}
-                  </div>
-                </>
-              )}
+                    </button>
+                  ))}
+                  {sidebarSessions.length === 0 && (
+                    <div className="px-3 text-slate-400 text-xs italic">
+                      No history yet
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Collapsed Desktop View - Show only icons */}
               {isDesktopSidebarCollapsed && (
@@ -770,8 +776,8 @@ export const ChatInterface: React.FC = () => {
               )}
             </div>
 
-            {/* User Profile / Lower Sidebar */}
-            {!isDesktopSidebarCollapsed && (
+            {/* User Profile / Lower Sidebar - Show on mobile when sidebar is open, or on desktop when not collapsed */}
+            <div className={isDesktopSidebarCollapsed ? "lg:hidden" : ""}>
               <div className="p-3 border-t border-slate-100 bg-white">
                 {user ? (
                   <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
@@ -798,7 +804,7 @@ export const ChatInterface: React.FC = () => {
                   </button>
                 )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Main Chat Area */}
@@ -1075,8 +1081,13 @@ export const ChatInterface: React.FC = () => {
                 />
                 <button
                   type="submit"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                  }}
                   disabled={isLoading || !inputValue.trim()}
-                  className="bg-indigo-600 text-white px-4 lg:px-6 py-2.5 lg:py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                  className="bg-indigo-600 text-white px-4 lg:px-6 py-2.5 lg:py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl touch-manipulation"
+                  style={{ touchAction: "manipulation" }}
                 >
                   Send
                 </button>
