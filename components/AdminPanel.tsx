@@ -98,6 +98,21 @@ export const AdminPanel: React.FC = () => {
     (a, b) => b.lastActive - a.lastActive
   );
 
+  // Prevent body scroll on mount (mobile viewport fix)
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    document.body.style.height = "100svh";
+    document.body.style.position = "fixed";
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.height = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+    };
+  }, []);
+
   useEffect(() => {
     let unsubscribeSessions: () => void;
     let unsubscribeUsers: () => void;
@@ -203,7 +218,7 @@ export const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
         {/* Header - Hidden on mobile when viewing a session */}
         <div
