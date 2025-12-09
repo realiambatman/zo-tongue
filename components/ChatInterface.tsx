@@ -519,7 +519,7 @@ export const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="h-screen h-[100svh] sm:h-[100dvh] bg-slate-50 px-2 sm:px-4 lg:px-8 flex flex-col overflow-hidden relative">
+    <div className="h-[100svh] h-screen bg-slate-50 px-2 sm:px-4 lg:px-8 flex flex-col overflow-hidden relative">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full min-h-0">
         <div
           className={`grid grid-cols-1 ${
