@@ -15,9 +15,9 @@ import { useNavigate } from "react-router-dom";
 
 export const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
-  const onBack = () => navigate('/');
+  const onBack = () => navigate("/");
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +34,10 @@ export const AdminPanel: React.FC = () => {
   const [tick, setTick] = useState(0); // To force re-render for active tab
 
   // Admin check: Allow access if email ends with @buildnbit.com
-  const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
+  // Only check after auth has finished loading to prevent false "Access Denied" flash
+  const isAdmin = authLoading
+    ? null
+    : user?.email?.endsWith("@buildnbit.com") ?? false;
 
   // Force re-render every 5 seconds to update "active" status
   useEffect(() => {
@@ -117,7 +120,8 @@ export const AdminPanel: React.FC = () => {
     let unsubscribeSessions: () => void;
     let unsubscribeUsers: () => void;
 
-    if (isAdmin) {
+    // Only proceed if auth has finished loading and user is confirmed admin
+    if (isAdmin === true) {
       unsubscribeSessions = subscribeToAllSessions((allSessions) => {
         setSessions(allSessions);
         setLoading(false);
@@ -132,9 +136,11 @@ export const AdminPanel: React.FC = () => {
       unsubscribeUsers = subscribeToAllUsers((allUsers) => {
         setUsers(allUsers);
       });
-    } else {
+    } else if (isAdmin === false) {
+      // Auth finished but user is not admin
       setLoading(false);
     }
+    // If isAdmin is null, we're still loading, so don't do anything
 
     return () => {
       if (unsubscribeSessions) unsubscribeSessions();
@@ -209,6 +215,19 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  // Show loading state while auth is checking
+  if (authLoading || isAdmin === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-canvas">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-ink border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-ink-muted">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied only after auth has finished loading and user is confirmed not admin
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-canvas">
