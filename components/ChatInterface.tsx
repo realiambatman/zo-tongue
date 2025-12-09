@@ -63,6 +63,8 @@ export const ChatInterface: React.FC = () => {
     const initSession = async () => {
       if (routeSessionId) {
         setIsSessionLoading(true);
+        // Collapse sidebar when loading existing session
+        setIsDesktopSidebarCollapsed(true);
         try {
           // Load existing session
           const session = await getSessionById(routeSessionId);
@@ -94,8 +96,9 @@ export const ChatInterface: React.FC = () => {
         return;
       }
 
-      // Default initialization
+      // Default initialization - collapse sidebar for new chats too
       if (!sessionId && isInitialMount.current) {
+        setIsDesktopSidebarCollapsed(true);
         initChat();
       }
       setIsSessionLoading(false);
@@ -638,7 +641,11 @@ export const ChatInterface: React.FC = () => {
                       setSessionId(null);
                       setMessages([]);
                       chatSessionRef.current = null;
-                      setIsSidebarOpen(false); // Close sidebar on mobile after creating new chat
+                      setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
+                      // Only close on mobile, keep open on desktop
+                      if (window.innerWidth < 1024) {
+                        setIsSidebarOpen(false);
+                      }
                     }}
                     className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
                   >
@@ -667,7 +674,11 @@ export const ChatInterface: React.FC = () => {
                         key={session.id}
                         onClick={() => {
                           navigate(`/chat/${session.id}`, { replace: true });
-                          setIsSidebarOpen(false); // Close sidebar on mobile after selecting chat
+                          setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
+                          // Only close on mobile, keep open on desktop
+                          if (window.innerWidth < 1024) {
+                            setIsSidebarOpen(false);
+                          }
                         }}
                         className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
                           sessionId === session.id
@@ -707,6 +718,7 @@ export const ChatInterface: React.FC = () => {
                       setSessionId(null);
                       setMessages([]);
                       chatSessionRef.current = null;
+                      setIsDesktopSidebarCollapsed(true); // Keep collapsed when creating new chat
                     }}
                     className="p-2 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors shadow-sm"
                     title="New chat"
@@ -730,6 +742,7 @@ export const ChatInterface: React.FC = () => {
                       key={session.id}
                       onClick={() => {
                         navigate(`/chat/${session.id}`, { replace: true });
+                        setIsDesktopSidebarCollapsed(true); // Keep collapsed when selecting chat
                       }}
                       className={`p-2 rounded-xl transition-all ${
                         sessionId === session.id
