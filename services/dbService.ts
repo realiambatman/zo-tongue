@@ -31,6 +31,51 @@ export interface ChatSession {
   ipAddress?: string | null; // IP address for guest tracking
 }
 
+/**
+ * Generate a short title from chat messages
+ * Uses the first user message to create a concise title
+ */
+export const generateChatTitle = (
+  messages: ChatMessage[],
+  language: SupportedLanguage
+): string => {
+  // Find the first non-system, non-error user message
+  const firstUserMessage = messages.find(
+    (m) => m.role === "user" && !m.isSystem && !m.isError
+  );
+
+  if (!firstUserMessage || !firstUserMessage.text) {
+    return `Chat in ${language}`;
+  }
+
+  const text = firstUserMessage.text.trim();
+
+  // If message is very short, use it directly (up to 40 chars)
+  if (text.length <= 40) {
+    return text;
+  }
+
+  // For longer messages, take first few words (up to 5 words or 40 chars)
+  const words = text.split(/\s+/);
+  let title = "";
+  for (let i = 0; i < Math.min(5, words.length); i++) {
+    const candidate = i === 0 ? words[i] : title + " " + words[i];
+    if (candidate.length <= 40) {
+      title = candidate;
+    } else {
+      break;
+    }
+  }
+
+  // If we have a title, add ellipsis if it's truncated
+  if (title && title.length < text.length) {
+    return title + "...";
+  }
+
+  // Fallback to language-based title
+  return `Chat in ${language}`;
+};
+
 export interface UserProfile {
   uid: string;
   email: string;

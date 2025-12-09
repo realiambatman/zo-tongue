@@ -13,6 +13,7 @@ import {
   subscribeToSession,
   fetchUserIP,
   ChatSession,
+  generateChatTitle,
 } from "../services/dbService";
 
 import { useParams, useNavigate } from "react-router-dom";
@@ -41,6 +42,8 @@ export const ChatInterface: React.FC = () => {
   const [sarcasmMode, setSarcasmMode] = useState(false);
   const [sidebarSessions, setSidebarSessions] = useState<ChatSession[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open on desktop
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
+    useState(false);
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
@@ -255,11 +258,14 @@ export const ChatInterface: React.FC = () => {
     // Only save if there are actual user/model messages (not just system messages)
     const hasRealMessages = messages.some((m) => !m.isSystem);
     if (sessionId && hasRealMessages && !isSessionLoading) {
+      // Generate title from messages, fallback to language-based title
+      const generatedTitle = generateChatTitle(messages, selectedLanguage);
+
       const sessionUpdate: ChatSession = {
         id: sessionId,
         userId: user?.uid || guestId,
         userEmail: user?.email || null,
-        title: `Chat in ${selectedLanguage}`,
+        title: generatedTitle,
         language: selectedLanguage,
         startTime: Date.now(),
         lastUpdated: Date.now(),
@@ -414,11 +420,12 @@ export const ChatInterface: React.FC = () => {
     // (React state update for sessionId may not have completed yet)
     // For existing sessions, the regular save effect will handle it
     if (sessionResult?.isNew) {
+      const generatedTitle = generateChatTitle([userMsg], selectedLanguage);
       saveChatSession({
         id: sessionResult.id,
         userId: user?.uid || guestId,
         userEmail: user?.email || null,
-        title: `Chat in ${selectedLanguage}`,
+        title: generatedTitle,
         language: selectedLanguage,
         startTime: Date.now(),
         lastUpdated: Date.now(),
@@ -512,107 +519,114 @@ export const ChatInterface: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
+    <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden relative">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8">
+        <div
+          className={`grid grid-cols-1 ${
+            isSidebarOpen && isDesktopSidebarCollapsed
+              ? "lg:grid-cols-[64px_1fr]"
+              : "lg:grid-cols-4"
+          } gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8`}
+        >
+          {/* Mobile Backdrop */}
+          {isSidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+          )}
+
           {/* Sidebar - Refined Admin Style */}
           <div
             className={`${
               isSidebarOpen
-                ? "lg:col-span-1 translate-x-0"
-                : "lg:col-span-0 -translate-x-full opacity-0 hidden"
-            } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full transition-all duration-300 ease-in-out shrink-0 relative z-30`}
+                ? isDesktopSidebarCollapsed
+                  ? "lg:w-16"
+                  : "lg:col-span-1 translate-x-0"
+                : "lg:col-span-0 -translate-x-full lg:translate-x-0 lg:opacity-0 lg:pointer-events-none"
+            } fixed lg:relative inset-y-0 left-0 w-[280px] sm:w-[320px] lg:w-auto z-50 lg:z-auto bg-white lg:rounded-[1.5rem] lg:rounded-[2rem] shadow-2xl lg:shadow-card overflow-hidden border border-slate-100 flex flex-col h-full transition-all duration-300 ease-in-out shrink-0`}
           >
             <div className="p-2 lg:p-3 flex-1 overflow-y-auto bg-slate-50/50">
-              <button
-                onClick={() => {
-                  navigate("/chat", { replace: true });
-                  setSessionId(null);
-                  setMessages([]);
-                  chatSessionRef.current = null;
-                }}
-                className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                <span className="text-sm font-medium">New chat</span>
-              </button>
-
-              <div className="space-y-2">
-                <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
-                  Recent
-                </h3>
-                {sidebarSessions.map((session) => (
-                  <button
-                    key={session.id}
-                    onClick={() =>
-                      navigate(`/chat/${session.id}`, { replace: true })
-                    }
-                    className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
-                      sessionId === session.id
-                        ? "bg-ink text-white shadow-lg"
-                        : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
-                    }`}
-                  >
-                    <div className="text-sm truncate w-full font-medium">
-                      {session.title || "New Chat"}
-                    </div>
-                    <div
-                      className={`text-[10px] truncate w-full mt-0.5 ${
-                        sessionId === session.id
-                          ? "text-slate-300"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      {new Date(session.lastUpdated).toLocaleDateString()}
-                    </div>
-                  </button>
-                ))}
-                {sidebarSessions.length === 0 && (
-                  <div className="px-3 text-slate-400 text-xs italic">
-                    No history yet
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* User Profile / Lower Sidebar */}
-            <div className="p-3 border-t border-slate-100 bg-white">
-              {user ? (
-                <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
-                  {user.photoURL && (
-                    <img
-                      src={user.photoURL}
-                      className="w-8 h-8 rounded-full border border-slate-200"
-                      alt="User"
-                    />
-                  )}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="text-sm text-ink font-medium truncate">
-                      {user.displayName || "User"}
-                    </div>
-                    <div className="text-xs text-slate-500 truncate">
-                      Free Plan
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              {/* Mobile Close Button */}
+              <div className="flex items-center justify-between mb-4 lg:hidden">
+                <h2 className="text-sm font-bold text-ink px-3">
+                  Chat History
+                </h2>
                 <button
-                  onClick={() => signInWithGoogle()}
-                  className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors w-full text-left"
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 text-slate-500 hover:text-ink transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Desktop Collapse Button */}
+              <div className="hidden lg:flex items-center justify-between mb-4">
+                {!isDesktopSidebarCollapsed && (
+                  <h2 className="text-sm font-bold text-ink px-3">
+                    Chat History
+                  </h2>
+                )}
+                <button
+                  onClick={() =>
+                    setIsDesktopSidebarCollapsed(!isDesktopSidebarCollapsed)
+                  }
+                  className="p-2 text-slate-500 hover:text-ink transition-colors ml-auto"
+                  title={
+                    isDesktopSidebarCollapsed
+                      ? "Expand sidebar"
+                      : "Collapse sidebar"
+                  }
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    {isDesktopSidebarCollapsed ? (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    ) : (
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    )}
+                  </svg>
+                </button>
+              </div>
+
+              {!isDesktopSidebarCollapsed && (
+                <>
+                  <button
+                    onClick={() => {
+                      navigate("/chat", { replace: true });
+                      setSessionId(null);
+                      setMessages([]);
+                      chatSessionRef.current = null;
+                      setIsSidebarOpen(false); // Close sidebar on mobile after creating new chat
+                    }}
+                    className="flex items-center gap-3 w-full px-3 py-3 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors mb-4 shadow-sm"
+                  >
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -623,31 +637,156 @@ export const ChatInterface: React.FC = () => {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                        d="M12 4v16m8-8H4"
                       />
                     </svg>
+                    <span className="text-sm font-medium">New chat</span>
+                  </button>
+
+                  <div className="space-y-2">
+                    <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
+                      Recent
+                    </h3>
+                    {sidebarSessions.map((session) => (
+                      <button
+                        key={session.id}
+                        onClick={() => {
+                          navigate(`/chat/${session.id}`, { replace: true });
+                          setIsSidebarOpen(false); // Close sidebar on mobile after selecting chat
+                        }}
+                        className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
+                          sessionId === session.id
+                            ? "bg-ink text-white shadow-lg"
+                            : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
+                        }`}
+                      >
+                        <div className="text-sm truncate w-full font-medium">
+                          {session.title || "New Chat"}
+                        </div>
+                        <div
+                          className={`text-[10px] truncate w-full mt-0.5 ${
+                            sessionId === session.id
+                              ? "text-slate-300"
+                              : "text-slate-400"
+                          }`}
+                        >
+                          {new Date(session.lastUpdated).toLocaleDateString()}
+                        </div>
+                      </button>
+                    ))}
+                    {sidebarSessions.length === 0 && (
+                      <div className="px-3 text-slate-400 text-xs italic">
+                        No history yet
+                      </div>
+                    )}
                   </div>
-                  <div className="flex-1">
-                    <div className="text-sm text-ink font-medium">Log in</div>
-                    <div className="text-xs text-slate-500">
-                      Save your chats
-                    </div>
-                  </div>
-                </button>
+                </>
+              )}
+
+              {/* Collapsed Desktop View - Show only icons */}
+              {isDesktopSidebarCollapsed && (
+                <div className="hidden lg:flex flex-col items-center gap-2">
+                  <button
+                    onClick={() => {
+                      navigate("/chat", { replace: true });
+                      setSessionId(null);
+                      setMessages([]);
+                      chatSessionRef.current = null;
+                    }}
+                    className="p-2 rounded-xl bg-white hover:bg-slate-50 text-ink border border-slate-100 transition-colors shadow-sm"
+                    title="New chat"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                  </button>
+                  {sidebarSessions.slice(0, 5).map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => {
+                        navigate(`/chat/${session.id}`, { replace: true });
+                      }}
+                      className={`p-2 rounded-xl transition-all ${
+                        sessionId === session.id
+                          ? "bg-ink text-white shadow-lg"
+                          : "bg-white text-ink border border-slate-100 hover:bg-slate-50"
+                      }`}
+                      title={session.title || "New Chat"}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+                        />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
+
+            {/* User Profile / Lower Sidebar */}
+            {!isDesktopSidebarCollapsed && (
+              <div className="p-3 border-t border-slate-100 bg-white">
+                {user ? (
+                  <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer">
+                    <div className="flex-1 overflow-hidden">
+                      <div className="text-sm text-ink font-medium truncate">
+                        {user.displayName || "User"}
+                      </div>
+                      <div className="text-xs text-slate-500 truncate">
+                        Free Plan
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => signInWithGoogle()}
+                    className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 transition-colors w-full text-left"
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm text-ink font-medium">Log in</div>
+                      <div className="text-xs text-slate-500">
+                        Save your chats
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Main Chat Area */}
           <div
             className={`${
-              isSidebarOpen ? "lg:col-span-3" : "lg:col-span-4"
+              isSidebarOpen
+                ? isDesktopSidebarCollapsed
+                  ? ""
+                  : "lg:col-span-3"
+                : "lg:col-span-4"
             } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full relative`}
           >
             {/* Header - Admin Style */}
             <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
               <button
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                onClick={() => setIsSidebarOpen(true)}
                 className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-ink transition-colors rounded-lg hover:bg-white"
               >
                 <svg
