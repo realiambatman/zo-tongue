@@ -467,7 +467,7 @@ export const LandingPage: React.FC = () => {
           HERO SECTION - Cinematic & Immersive (Sticky/Fixed for Parallax)
           ======================================== */}
       <div className="sticky top-0 z-0 w-full h-[100dvh] sm:h-screen min-h-[600px] sm:min-h-[700px]">
-        <section className="absolute inset-0 bg-slate-200 overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-24">
+        <section className="absolute inset-0 bg-slate-300 overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-24">
           {/* Atmospheric Background */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Soft gradient orbs - Enhanced for Mobile */}
