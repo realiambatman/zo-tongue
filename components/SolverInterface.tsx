@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 export const SolverInterface: React.FC = () => {
   const navigate = useNavigate();
-  const onBack = () => navigate('/');
+  const onBack = () => navigate("/");
 
   const { user } = useAuth();
   const [targetLang, setTargetLang] = useState<SupportedLanguage>(
@@ -92,32 +92,42 @@ export const SolverInterface: React.FC = () => {
     setUsage(null);
 
     try {
+      // Allow image-only submissions - use default prompt if image exists but no text
+      const questionText = input.trim() || (image ? "Solve this problem" : "");
       const response = await solveMultimodal(
         image?.data || null,
         image?.mime || null,
-        input,
+        questionText,
         targetLang
       );
       setResult(response.text);
       setUsage(response.usage);
 
-      // Only create session and save if solve was successful
-      const currentSessionId = await ensureSessionExists();
-      if (currentSessionId) {
-        const timestamp = Date.now();
-        await addMessageToSession(currentSessionId, {
-          id: timestamp.toString(),
-          role: "user",
-          text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
-          timestamp: timestamp,
-        });
-        await addMessageToSession(currentSessionId, {
-          id: (timestamp + 1).toString(),
-          role: "model",
-          text: response.text,
-          timestamp: timestamp + 1,
-          usage: response.usage,
-        });
+      // Try to save to session, but don't fail if it doesn't work (e.g., Firebase Storage not configured)
+      try {
+        const currentSessionId = await ensureSessionExists();
+        if (currentSessionId) {
+          const timestamp = Date.now();
+          await addMessageToSession(currentSessionId, {
+            id: timestamp.toString(),
+            role: "user",
+            text: `[Solve in ${targetLang}] ${input || "(Image Uploaded)"}`,
+            timestamp: timestamp,
+          });
+          await addMessageToSession(currentSessionId, {
+            id: (timestamp + 1).toString(),
+            role: "model",
+            text: response.text,
+            timestamp: timestamp + 1,
+            usage: response.usage,
+          });
+        }
+      } catch (saveError) {
+        // Log but don't fail - solving worked, saving is optional
+        console.warn(
+          "Failed to save to session (this is okay if Firebase Storage is not configured):",
+          saveError
+        );
       }
     } catch (e) {
       setResult("Sorry, something went wrong. Please try again.");
@@ -188,17 +198,17 @@ export const SolverInterface: React.FC = () => {
           <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-ink-muted mt-0.5">
             Visual Problem Solving
           </p>
-      </div>
+        </div>
         <div className="w-44">
-            <LanguageSelector
-              selected={targetLang}
-              onChange={setTargetLang}
-              label="Answer Language"
-            />
-          </div>
+          <LanguageSelector
+            selected={targetLang}
+            onChange={setTargetLang}
+            label="Answer Language"
+          />
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-5 pb-28 space-y-5 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar min-h-0">
         {/* Image Input Area */}
         <div className="space-y-3">
           <label className="block font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">
@@ -210,8 +220,8 @@ export const SolverInterface: React.FC = () => {
               relative w-full h-52 rounded-3xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden flex flex-col items-center justify-center
                     ${
                       image
-                  ? "border-accent bg-ink"
-                  : "border-slate-200 bg-surface hover:bg-slate-50 hover:border-accent/50"
+                        ? "border-accent bg-ink"
+                        : "border-slate-200 bg-surface hover:bg-slate-50 hover:border-accent/50"
                     }
                 `}
           >
@@ -324,19 +334,19 @@ export const SolverInterface: React.FC = () => {
           <div className="bg-accent-light rounded-3xl shadow-card border border-accent/10 overflow-hidden animate-enter">
             <div className="px-5 py-4 bg-accent/5 border-b border-accent/10 flex items-center gap-3">
               <div className="w-8 h-8 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
-              <svg
+                <svg
                   className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  />
+                </svg>
               </div>
               <h3 className="font-display font-bold text-accent text-sm">
                 Solution
@@ -363,8 +373,8 @@ export const SolverInterface: React.FC = () => {
         )}
       </div>
 
-      {/* Floating Action Button */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-canvas via-canvas to-transparent pt-10 z-30">
+      {/* Solve Button - Fixed at bottom like ChatInterface */}
+      <div className="p-5 bg-canvas border-t border-slate-100 shrink-0">
         <button
           onClick={handleSolve}
           disabled={isLoading || (!input.trim() && !image)}

@@ -41,7 +41,13 @@ export const ChatInterface: React.FC = () => {
   const [showSignInNudge, setShowSignInNudge] = useState(true);
   const [sarcasmMode, setSarcasmMode] = useState(false);
   const [sidebarSessions, setSidebarSessions] = useState<ChatSession[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Default open on desktop
+  // Default closed on mobile, open on desktop
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 1024; // lg breakpoint
+    }
+    return false; // Default to closed for SSR
+  });
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] =
     useState(false);
   const chatSessionRef = useRef<Chat | null>(null);
@@ -568,7 +574,7 @@ export const ChatInterface: React.FC = () => {
                 ? isDesktopSidebarCollapsed
                   ? "lg:w-16"
                   : "lg:col-span-1 translate-x-0"
-                : "lg:col-span-0 -translate-x-full lg:translate-x-0 lg:opacity-0 lg:pointer-events-none"
+                : "lg:col-span-0 -translate-x-full lg:translate-x-0 lg:opacity-0 lg:pointer-events-none lg:hidden"
             } fixed lg:relative inset-y-0 left-0 w-[280px] sm:w-[320px] lg:w-auto z-50 lg:z-auto bg-white lg:rounded-[1.5rem] lg:rounded-[2rem] shadow-2xl lg:shadow-card overflow-hidden border border-slate-100 flex flex-col h-full transition-all duration-300 ease-in-out shrink-0`}
           >
             <div className="p-2 lg:p-3 flex-1 overflow-y-auto bg-slate-50/50">
@@ -715,8 +721,8 @@ export const ChatInterface: React.FC = () => {
                 </div>
               </div>
 
-              {/* Collapsed Desktop View - Show only icons */}
-              {isDesktopSidebarCollapsed && (
+              {/* Collapsed Desktop View - Show only icons when sidebar is open and collapsed */}
+              {isDesktopSidebarCollapsed && isSidebarOpen && (
                 <div className="hidden lg:flex flex-col items-center gap-2">
                   <button
                     onClick={() => {
