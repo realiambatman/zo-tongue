@@ -528,7 +528,9 @@ export const LandingPage: React.FC = () => {
                 <RevealText className="text-[12vw] sm:text-[11vw] md:text-[10vw] lg:text-[8vw] font-display font-bold tracking-tighter leading-[0.95] sm:leading-[0.85] lg:leading-[0.75] uppercase text-ink mb-4 sm:mb-6 md:mb-8">
                   Master
                   <br />
-                  <span className="text-accent">Languages</span>
+                  <span className="text-transparent stroke-text bg-clip-text bg-gradient-to-r from-white via-white/50 to-transparent">
+                    Languages
+                  </span>
                   <br />
                   Effortlessly
                 </RevealText>
