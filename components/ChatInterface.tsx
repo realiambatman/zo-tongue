@@ -520,7 +520,7 @@ export const ChatInterface: React.FC = () => {
 
   return (
     <div className="h-screen bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden relative">
-      <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+      <div className="max-w-7xl mx-auto w-full flex flex-col h-full min-h-0">
         <div
           className={`grid grid-cols-1 ${
             isSidebarOpen && isDesktopSidebarCollapsed
@@ -781,7 +781,7 @@ export const ChatInterface: React.FC = () => {
                   ? ""
                   : "lg:col-span-3"
                 : "lg:col-span-4"
-            } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full relative`}
+            } bg-white rounded-[1.5rem] lg:rounded-[2rem] shadow-card overflow-hidden border border-slate-100 flex flex-col h-full min-h-0 relative`}
           >
             {/* Header - Admin Style */}
             <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
@@ -890,7 +890,7 @@ export const ChatInterface: React.FC = () => {
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar min-h-0">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar min-h-0 overscroll-contain">
               {messages.map((msg, index) => {
                 if (msg.isSystem) {
                   return (
