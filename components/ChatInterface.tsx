@@ -500,7 +500,7 @@ export const ChatInterface: React.FC = () => {
 
     let serverDateTime: string | undefined;
     if (needsServerTime) {
-      // Use cached serverDate if available, otherwise fetch fresh
+      // Always try to use cached serverDate first
       if (serverDate) {
         serverDateTime = serverDate;
       } else {
@@ -514,15 +514,30 @@ export const ChatInterface: React.FC = () => {
           console.warn(
             "Failed to fetch server time, using local time fallback"
           );
-          // Will use undefined, backend will use local time
+          // Generate a fallback date in IST format
+          const now = new Date();
+          const istOffset = 5.5 * 60 * 60 * 1000;
+          const istTime = new Date(now.getTime() + istOffset);
+          serverDateTime = istTime.toISOString().replace("Z", "+05:30");
         } finally {
           setIsFetchingDate(false);
         }
       }
     }
 
+    // For current events or specific event queries, always enable search
+    // This ensures accuracy when asking about specific events, people, or places
+    const shouldUseSearch =
+      needsSearch ||
+      // Also enable search for queries about specific entities (likely current events)
+      (userText.length > 15 &&
+        (userText.match(
+          /\b(about|regarding|tell me|explain|what|who|when|where)\s+(.*?)\b/i
+        ) ||
+          (userText.includes("?") && userText.length > 20)));
+
     // Show searching indicator if needed
-    if (needsSearch) {
+    if (shouldUseSearch) {
       setIsSearching(true);
     }
 
@@ -532,7 +547,7 @@ export const ChatInterface: React.FC = () => {
         chatSessionRef.current as any
       ).sendMessageStream({
         message: userText,
-        useSearch: needsSearch,
+        useSearch: shouldUseSearch,
         currentDateTime: serverDateTime,
       });
 

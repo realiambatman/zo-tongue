@@ -7,27 +7,61 @@ export const fetchServerTime = async (): Promise<string> => {
   try {
     // Set a short timeout to ensure the UI doesn't hang if the time API is slow
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Increased timeout for production
 
-    const response = await fetch(
-      "https://worldtimeapi.org/api/timezone/Asia/Kolkata",
-      {
-        signal: controller.signal,
+    // Try primary API first
+    try {
+      const response = await fetch(
+        "https://worldtimeapi.org/api/timezone/Asia/Kolkata",
+        {
+          signal: controller.signal,
+          cache: "no-cache", // Ensure fresh data
+        }
+      );
+
+      clearTimeout(timeoutId);
+      if (response.ok) {
+        const data = await response.json();
+        // Return full datetime string in ISO format
+        return data.datetime;
       }
-    );
-
-    clearTimeout(timeoutId);
-    if (response.ok) {
-      const data = await response.json();
-      // Return full datetime string in ISO format
-      return data.datetime;
+    } catch (primaryError) {
+      clearTimeout(timeoutId);
+      // Try fallback API
+      try {
+        const fallbackController = new AbortController();
+        const fallbackTimeout = setTimeout(
+          () => fallbackController.abort(),
+          2000
+        );
+        const fallbackResponse = await fetch(
+          "https://timeapi.io/api/Time/current/zone?timeZone=Asia/Kolkata",
+          {
+            signal: fallbackController.signal,
+            cache: "no-cache",
+          }
+        );
+        clearTimeout(fallbackTimeout);
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          // Format as ISO string
+          return new Date(fallbackData.dateTime).toISOString();
+        }
+      } catch (fallbackError) {
+        // Both APIs failed, will use local time
+      }
     }
   } catch (error) {
     console.warn("Failed to fetch server time, falling back to local time.");
   }
 
   // Fallback to local system time if API fails
-  return new Date().toISOString();
+  // Format it properly for IST timezone
+  const now = new Date();
+  // Convert to IST (UTC+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+  const istTime = new Date(now.getTime() + istOffset);
+  return istTime.toISOString().replace("Z", "+05:30");
 };
 
 // Helper to detect if query is about date/time
@@ -58,10 +92,12 @@ export const isDateTimeQuery = (query: string): boolean => {
   return dateTimeKeywords.some((keyword) => lowerQuery.includes(keyword));
 };
 
-// Helper to detect if query is about current events/news
+// Helper to detect if query is about current events/news (works in English and native languages)
 export const isCurrentEventsQuery = (query: string): boolean => {
   const lowerQuery = query.toLowerCase();
-  const currentEventsKeywords = [
+
+  // English keywords
+  const englishKeywords = [
     "news",
     "latest",
     "recent",
@@ -85,8 +121,51 @@ export const isCurrentEventsQuery = (query: string): boolean => {
     "what is happening",
     "current situation",
     "recent developments",
+    "update",
+    "updates",
+    "happening",
+    "event",
+    "events",
   ];
-  return currentEventsKeywords.some((keyword) => lowerQuery.includes(keyword));
+
+  // Common patterns that indicate current events queries
+  // These work across languages (asking about specific people, places, events)
+  const eventPatterns = [
+    // Questions about specific people/entities
+    /\b(who|what|when|where|why|how)\s+(is|are|was|were|did|does|will|happened|happening)\b/i,
+    // Questions about current status
+    /\b(current|latest|recent|new|today|now)\s+(.*?)\b/i,
+    // Questions about specific events/incidents
+    /\b(about|regarding|concerning)\s+(.*?)\b/i,
+    // Questions with time indicators
+    /\b(today|yesterday|this week|this month|now|currently)\s+(.*?)\b/i,
+  ];
+
+  // Check English keywords
+  if (englishKeywords.some((keyword) => lowerQuery.includes(keyword))) {
+    return true;
+  }
+
+  // Check for event patterns (works in any language)
+  if (eventPatterns.some((pattern) => pattern.test(query))) {
+    return true;
+  }
+
+  // Check for queries about specific entities (names, places, organizations)
+  // These often indicate current events queries
+  const hasSpecificEntity =
+    query.length > 10 && // Not too short
+    (query.includes("?") || query.includes("bang") || query.includes("eng")); // Question indicators
+
+  // If query is asking about something specific and is a question, likely current events
+  if (
+    hasSpecificEntity &&
+    (query.includes("?") || query.match(/\b(bang|eng|what|who|when|where)\b/i))
+  ) {
+    return true;
+  }
+
+  return false;
 };
 
 /**
