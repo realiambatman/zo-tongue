@@ -16,28 +16,63 @@ import SolverInterface from "./components/SolverInterface";
 import { ProfilePage } from "./components/ProfilePage";
 import { AdminPanel } from "./components/AdminPanel";
 import { ServiceUnavailable } from "./components/ServiceUnavailable";
-import { subscribeToMaintenanceMode } from "./services/dbService";
+import {
+  subscribeToMaintenanceMode,
+  getMaintenanceMode,
+} from "./services/dbService";
 
 // Component to check maintenance mode
 const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(
+    null
+  ); // null = loading
   const { user } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
-    // Subscribe to maintenance mode changes
+    let isMounted = true;
+
+    // Immediately check maintenance mode (fast async check)
+    const checkMaintenance = async () => {
+      try {
+        const isEnabled = await getMaintenanceMode();
+        if (isMounted) {
+          setIsMaintenanceMode(isEnabled);
+        }
+      } catch (error) {
+        console.error("Error checking maintenance mode:", error);
+        if (isMounted) {
+          setIsMaintenanceMode(false); // Default to not in maintenance on error
+        }
+      }
+    };
+
+    // Check immediately (no delay)
+    checkMaintenance();
+
+    // Then subscribe for real-time updates
     const unsubscribe = subscribeToMaintenanceMode((isEnabled) => {
-      setIsMaintenanceMode(isEnabled);
+      if (isMounted) {
+        setIsMaintenanceMode(isEnabled);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // Allow admins to access admin panel even during maintenance
   const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
   const isAdminRoute = location.pathname === "/admin";
+
+  // Return null while checking to prevent any flash of content
+  if (isMaintenanceMode === null) {
+    return null;
+  }
 
   // Show maintenance page if enabled, unless user is admin accessing admin panel
   if (isMaintenanceMode && !(isAdmin && isAdminRoute)) {
