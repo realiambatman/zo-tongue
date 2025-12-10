@@ -3,13 +3,15 @@ import { SupportedLanguage, StudyData } from "../types";
 import { apiClient, ChatHistoryItem } from "./apiClient";
 
 // Fetch real-time data from a time server to prevent stale client-side dates
-export const fetchServerTime = async (): Promise<string> => {
+// Retries up to 2 times as the API often fails on first attempt
+export const fetchServerTime = async (retryCount = 0): Promise<string> => {
+  const MAX_RETRIES = 2;
+
   try {
     // Set a short timeout to ensure the UI doesn't hang if the time API is slow
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Increased timeout for production
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    // Try primary API first
     try {
       const response = await fetch(
         "https://worldtimeapi.org/api/timezone/Asia/Kolkata",
@@ -24,10 +26,23 @@ export const fetchServerTime = async (): Promise<string> => {
         const data = await response.json();
         // Return full datetime string in ISO format
         return data.datetime;
+      } else {
+        // If response not ok, throw to trigger retry
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (primaryError) {
       clearTimeout(timeoutId);
-      // Try fallback API
+
+      // Retry if we haven't exceeded max retries
+      if (retryCount < MAX_RETRIES) {
+        // Wait a bit before retrying (exponential backoff: 500ms, 1000ms)
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * (retryCount + 1))
+        );
+        return fetchServerTime(retryCount + 1);
+      }
+
+      // If primary API failed after retries, try fallback API
       try {
         const fallbackController = new AbortController();
         const fallbackTimeout = setTimeout(
@@ -52,7 +67,12 @@ export const fetchServerTime = async (): Promise<string> => {
       }
     }
   } catch (error) {
-    console.warn("Failed to fetch server time, falling back to local time.");
+    // Only log warning on final failure (not on retries)
+    if (retryCount >= MAX_RETRIES) {
+      console.warn(
+        "Failed to fetch server time after retries, falling back to local time."
+      );
+    }
   }
 
   // Fallback to local system time if API fails
@@ -94,57 +114,69 @@ export const isDateTimeQuery = (query: string): boolean => {
 
 // Helper to detect if query is about current events/news (works in English and native languages)
 export const isCurrentEventsQuery = (query: string): boolean => {
-  const lowerQuery = query.toLowerCase();
+  const lowerQuery = query.toLowerCase().trim();
 
-  // English keywords
+  // Exclude common greetings and simple questions
+  const greetingPatterns = [
+    /^how\s+are\s+you/i,
+    /^how\s+do\s+you\s+do/i,
+    /^how\s+is\s+it\s+going/i,
+    /^how\s+are\s+things/i,
+    /^what's\s+up/i,
+    /^what\s+is\s+up/i,
+    /^hi\s*$/i,
+    /^hello\s*$/i,
+    /^hey\s*$/i,
+    /^greetings/i,
+    /^good\s+(morning|afternoon|evening)/i,
+  ];
+
+  // If it's just a greeting, don't search
+  if (greetingPatterns.some((pattern) => pattern.test(lowerQuery))) {
+    return false;
+  }
+
+  // English keywords (must be more specific)
   const englishKeywords = [
     "news",
-    "latest",
-    "recent",
+    "latest news",
+    "recent news",
     "current events",
     "happening now",
     "what happened",
-    "breaking",
+    "breaking news",
     "today's news",
     "current news",
-    "recent news",
-    "latest news",
     "what's happening",
     "what happened today",
     "current affairs",
     "recent events",
     "latest updates",
-    "breaking news",
-    "today news",
+    "breaking",
     "news today",
     "what's new",
     "what is happening",
     "current situation",
     "recent developments",
-    "update",
-    "updates",
-    "happening",
-    "event",
-    "events",
   ];
 
-  // Common patterns that indicate current events queries
-  // These work across languages (asking about specific people, places, events)
-  const eventPatterns = [
-    // Questions about specific people/entities
-    /\b(who|what|when|where|why|how)\s+(is|are|was|were|did|does|will|happened|happening)\b/i,
-    // Questions about current status
-    /\b(current|latest|recent|new|today|now)\s+(.*?)\b/i,
-    // Questions about specific events/incidents
-    /\b(about|regarding|concerning)\s+(.*?)\b/i,
-    // Questions with time indicators
-    /\b(today|yesterday|this week|this month|now|currently)\s+(.*?)\b/i,
-  ];
-
-  // Check English keywords
+  // Check English keywords (exact matches or phrases)
   if (englishKeywords.some((keyword) => lowerQuery.includes(keyword))) {
     return true;
   }
+
+  // More specific patterns that indicate current events queries
+  // Exclude simple "how are you" type questions
+  const eventPatterns = [
+    // Questions about specific people/entities (but not "how are you")
+    /\b(who|what|when|where|why)\s+(is|are|was|were|did|does|will|happened|happening)\s+(?!you|your|yours)\w+/i,
+    // Questions about current status with context
+    /\b(current|latest|recent|new|today|now)\s+(news|events|updates|developments|situation|affairs)/i,
+    // Questions about specific events/incidents
+    /\b(about|regarding|concerning|tell me about|explain)\s+(.*?)\b/i,
+    // Questions with time indicators and context
+    /\b(today|yesterday|this week|this month|now|currently)\s+(.*?)(news|event|happened|happening)/i,
+  ];
 
   // Check for event patterns (works in any language)
   if (eventPatterns.some((pattern) => pattern.test(query))) {
@@ -152,10 +184,13 @@ export const isCurrentEventsQuery = (query: string): boolean => {
   }
 
   // Check for queries about specific entities (names, places, organizations)
-  // These often indicate current events queries
+  // Only if query is long enough and has context
   const hasSpecificEntity =
-    query.length > 10 && // Not too short
-    (query.includes("?") || query.includes("bang") || query.includes("eng")); // Question indicators
+    query.length > 20 && // Longer queries are more likely to be about events
+    (query.includes("?") || query.includes("bang") || query.includes("eng")) && // Question indicators
+    !lowerQuery.match(
+      /^(how|what|who|when|where)\s+(are|is|do|does)\s+(you|your|yours)/i
+    ); // Exclude personal questions
 
   // If query is asking about something specific and is a question, likely current events
   if (

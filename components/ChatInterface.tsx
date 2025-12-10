@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { ChatMessage, SupportedLanguage } from "../types";
 import {
   createChatSession,
@@ -22,6 +28,14 @@ import {
 } from "../services/dbService";
 
 import { useParams, useNavigate } from "react-router-dom";
+
+// Memoize regex patterns to avoid recompiling on every render
+const GREETING_PATTERN =
+  /^(how\s+are\s+you|how\s+do\s+you\s+do|how\s+is\s+it\s+going|what's\s+up|hi|hello|hey)\s*[?.!]?$/i;
+const ENTITY_QUERY_PATTERN =
+  /\b(about|regarding|tell me about|explain|what happened|who is|when did|where is)\s+(.*?)\b/i;
+const PERSONAL_QUESTION_PATTERN =
+  /^(how|what)\s+(are|is|do|does)\s+(you|your)/i;
 
 // ... imports remain the same
 
@@ -174,28 +188,56 @@ export const ChatInterface: React.FC = () => {
     messagesRef.current = messages;
   }, [messages]);
 
-  const streamMessageText = (msgId: string, fullText: string) => {
+  // Optimize: use requestAnimationFrame for smoother updates and batch state updates
+  const streamMessageText = useCallback((msgId: string, fullText: string) => {
     let currentIndex = 0;
     // Faster typing for longer messages
     const speed = fullText.length > 100 ? 10 : 20;
+    let rafId: number | null = null;
+    let lastUpdate = 0;
 
-    const interval = setInterval(() => {
-      currentIndex += 2; // 2 chars at a time for snappiness
-      if (currentIndex > fullText.length) currentIndex = fullText.length;
+    const update = (timestamp: number) => {
+      if (timestamp - lastUpdate >= speed) {
+        currentIndex += 2; // 2 chars at a time for snappiness
+        if (currentIndex > fullText.length) currentIndex = fullText.length;
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId
-            ? { ...m, text: fullText.substring(0, currentIndex) }
-            : m
-        )
-      );
+        setMessages((prev) => {
+          // Optimize: only update if message exists and text changed
+          const msgIndex = prev.findIndex((m) => m.id === msgId);
+          if (msgIndex === -1) return prev;
 
-      if (currentIndex >= fullText.length) {
-        clearInterval(interval);
+          const msg = prev[msgIndex];
+          const newText = fullText.substring(0, currentIndex);
+          if (msg.text === newText) return prev; // Skip update if unchanged
+
+          // Create new array with updated message
+          const updated = [...prev];
+          updated[msgIndex] = { ...msg, text: newText };
+          return updated;
+        });
+
+        lastUpdate = timestamp;
+
+        if (currentIndex >= fullText.length) {
+          if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          return;
+        }
       }
-    }, speed);
-  };
+      rafId = requestAnimationFrame(update);
+    };
+
+    rafId = requestAnimationFrame(update);
+
+    // Cleanup function
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -298,20 +340,215 @@ export const ChatInterface: React.FC = () => {
     [routeSessionId, user, guestId]
   );
 
+  // Memoize title generation to avoid recalculating on every render
+  const chatTitle = useMemo(() => {
+    const hasRealMessages = messages.some((m) => !m.isSystem);
+    if (!hasRealMessages) return null;
+    return generateChatTitle(messages, selectedLanguage);
+  }, [messages, selectedLanguage]);
+
+  // Memoize sidebar sessions list to avoid unnecessary re-renders
+  const memoizedSidebarSessions = useMemo(
+    () =>
+      sidebarSessions.map((session) => (
+        <button
+          key={session.id}
+          onClick={() => {
+            navigate(`/chat/${session.id}`, { replace: true });
+            setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
+            // Only close on mobile, keep open on desktop
+            if (window.innerWidth < 1024) {
+              setIsSidebarOpen(false);
+            }
+          }}
+          className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
+            sessionId === session.id
+              ? "bg-ink text-white shadow-lg"
+              : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
+          }`}
+        >
+          <div className="text-sm truncate w-full font-medium">
+            {session.title || "New Chat"}
+          </div>
+          <div
+            className={`text-[10px] truncate w-full mt-0.5 ${
+              sessionId === session.id ? "text-slate-300" : "text-slate-400"
+            }`}
+          >
+            {new Date(session.lastUpdated).toLocaleDateString()}
+          </div>
+        </button>
+      )),
+    [sidebarSessions, sessionId, navigate]
+  );
+
+  // Memoize collapsed sidebar sessions
+  const memoizedCollapsedSidebarSessions = useMemo(
+    () =>
+      sidebarSessions.slice(0, 5).map((session) => (
+        <button
+          key={session.id}
+          onClick={() => {
+            navigate(`/chat/${session.id}`, { replace: true });
+            setIsDesktopSidebarCollapsed(true); // Keep collapsed when selecting chat
+          }}
+          className={`p-2 rounded-xl transition-all ${
+            sessionId === session.id
+              ? "bg-ink text-white shadow-lg"
+              : "bg-white text-ink border border-slate-100 hover:bg-slate-50"
+          }`}
+          title={session.title || "New Chat"}
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+            />
+          </svg>
+        </button>
+      )),
+    [sidebarSessions, sessionId, navigate]
+  );
+
+  // Memoize messages list to avoid unnecessary re-renders
+  const memoizedMessages = useMemo(
+    () =>
+      messages.map((msg, index) => {
+        if (msg.isSystem) {
+          return (
+            <div
+              key={msg.id}
+              className="flex w-full justify-center opacity-0 animate-enter"
+              style={{
+                animationDelay: `${index * 50}ms`,
+                animationFillMode: "forwards",
+              }}
+            >
+              <span className="px-3 py-1 bg-slate-50 text-ink-muted/60 text-[10px] font-mono uppercase tracking-widest rounded-full border border-slate-100">
+                {msg.text}
+              </span>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={msg.id}
+            className={`flex w-full opacity-0 animate-enter ${
+              msg.role === "user" ? "justify-end" : "justify-start"
+            }`}
+            style={{
+              animationDelay: `${index * 50}ms`,
+              animationFillMode: "forwards",
+            }}
+          >
+            <div className="flex flex-col max-w-[90%] lg:max-w-[85%]">
+              {/* Label */}
+              <span
+                className={`text-[9px] lg:text-[10px] font-mono uppercase mb-1 ${
+                  msg.role === "user"
+                    ? "text-right text-slate-400"
+                    : "text-left text-accent"
+                }`}
+              >
+                {msg.role === "user" ? "You" : msg.isError ? "Error" : "AI"}
+              </span>
+
+              {/* Bubble */}
+              <div
+                className={`
+                  px-4 lg:px-5 py-3 lg:py-4 text-sm leading-relaxed shadow-sm
+                  ${
+                    msg.role === "user"
+                      ? "bg-white border border-slate-200 text-ink rounded-2xl lg:rounded-3xl rounded-br-lg"
+                      : msg.isError
+                      ? "bg-red-50 text-red-800 border border-red-100 rounded-2xl lg:rounded-3xl rounded-bl-lg"
+                      : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-bl-lg"
+                  }
+                `}
+              >
+                {msg.role === "user" ? (
+                  msg.text
+                ) : (
+                  <MarkdownRenderer
+                    content={msg.text}
+                    className={msg.isError ? "text-red-800 prose-red" : ""}
+                  />
+                )}
+              </div>
+              <span
+                className={`text-[10px] text-slate-300 mt-1 px-2 ${
+                  msg.role === "user" ? "text-right" : "text-left"
+                }`}
+              >
+                {new Date(msg.timestamp).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </span>
+              {msg.sources && msg.sources.length > 0 && (
+                <div className="mt-2 px-2">
+                  <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
+                    Sources:
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {msg.sources.map((source, idx) => (
+                      <a
+                        key={idx}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-indigo-600 hover:text-indigo-800 underline truncate"
+                      >
+                        {source.title || source.url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {msg.usage &&
+                msg.role === "model" &&
+                !msg.isError &&
+                !msg.isAdminReply && (
+                  <div className="mt-1 ml-2 font-mono text-[10px] text-slate-400 flex items-center gap-3">
+                    <span>{msg.usage.candidatesTokenCount || 0} output</span>
+                    {msg.usage.thoughtsTokenCount &&
+                      msg.usage.thoughtsTokenCount > 0 && (
+                        <span className="text-accent">
+                          • {msg.usage.thoughtsTokenCount} thoughts
+                        </span>
+                      )}
+                    {msg.usage.totalTokenCount && (
+                      <span>• {msg.usage.totalTokenCount} total</span>
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        );
+      }),
+    [messages]
+  );
+
   // Save messages to Firestore whenever they change (only if there are real messages)
   // Also saves when language changes to update the session language
   useEffect(() => {
     // Only save if there are actual user/model messages (not just system messages)
     const hasRealMessages = messages.some((m) => !m.isSystem);
-    if (sessionId && hasRealMessages && !isSessionLoading) {
-      // Generate title from messages, fallback to language-based title
-      const generatedTitle = generateChatTitle(messages, selectedLanguage);
-
+    if (sessionId && hasRealMessages && !isSessionLoading && chatTitle) {
       const sessionUpdate: ChatSession = {
         id: sessionId,
         userId: user?.uid || guestId,
         userEmail: user?.email || null,
-        title: generatedTitle,
+        title: chatTitle,
         language: selectedLanguage,
         startTime: Date.now(),
         lastUpdated: Date.now(),
@@ -320,7 +557,15 @@ export const ChatInterface: React.FC = () => {
       };
       saveChatSession(sessionUpdate);
     }
-  }, [messages, sessionId, user, isSessionLoading, guestId, selectedLanguage]);
+  }, [
+    messages,
+    sessionId,
+    user,
+    isSessionLoading,
+    guestId,
+    selectedLanguage,
+    chatTitle,
+  ]);
 
   const initChat = useCallback(() => {
     chatSessionRef.current = createChatSession(
@@ -527,14 +772,20 @@ export const ChatInterface: React.FC = () => {
 
     // For current events or specific event queries, always enable search
     // This ensures accuracy when asking about specific events, people, or places
+    // Exclude simple greetings and personal questions
+    // Optimize: use memoized regex patterns
+    const lowerUserText = userText.toLowerCase().trim();
+    const isSimpleGreeting = GREETING_PATTERN.test(lowerUserText);
+
     const shouldUseSearch =
-      needsSearch ||
+      needsSearch &&
+      !isSimpleGreeting &&
       // Also enable search for queries about specific entities (likely current events)
-      (userText.length > 15 &&
-        (userText.match(
-          /\b(about|regarding|tell me|explain|what|who|when|where)\s+(.*?)\b/i
-        ) ||
-          (userText.includes("?") && userText.length > 20)));
+      userText.length > 15 &&
+      (ENTITY_QUERY_PATTERN.test(userText) ||
+        (userText.includes("?") &&
+          userText.length > 20 &&
+          !PERSONAL_QUESTION_PATTERN.test(lowerUserText)));
 
     // Show searching indicator if needed
     if (shouldUseSearch) {
@@ -584,13 +835,21 @@ export const ChatInterface: React.FC = () => {
           finalSources = (chunk as any).sources;
         }
 
-        // Update the message with accumulated text
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === botMsgId ? { ...msg, text: fullResponseText } : msg
-          )
-        );
+        // Update the message with accumulated text - optimize: only update if changed
+        setMessages((prev) => {
+          const msgIndex = prev.findIndex((m) => m.id === botMsgId);
+          if (msgIndex === -1) return prev;
+          const msg = prev[msgIndex];
+          if (msg.text === fullResponseText) return prev; // Skip if unchanged
+          const updated = [...prev];
+          updated[msgIndex] = { ...msg, text: fullResponseText };
+          return updated;
+        });
       }
+
+      // Check if response is empty and mark as error
+      const isEmptyResponse =
+        !fullResponseText || fullResponseText.trim().length === 0;
 
       // Final update with usage metadata and sources
       setMessages((prev) =>
@@ -598,18 +857,27 @@ export const ChatInterface: React.FC = () => {
           msg.id === botMsgId
             ? {
                 ...msg,
-                isError: fullResponseText.includes(
-                  "That is not the selected language"
-                ),
+                text: isEmptyResponse
+                  ? "Sorry, I couldn't generate a response. Please try again."
+                  : fullResponseText,
+                isError:
+                  isEmptyResponse ||
+                  fullResponseText.includes(
+                    "That is not the selected language"
+                  ),
                 usage: finalUsage
                   ? {
-                      thoughtsTokenCount: finalUsage.thoughtsTokenCount,
-                      candidatesTokenCount: finalUsage.candidatesTokenCount,
-                      promptTokenCount: finalUsage.promptTokenCount,
-                      totalTokenCount: finalUsage.totalTokenCount,
+                      thoughtsTokenCount: finalUsage.thoughtsTokenCount || 0,
+                      candidatesTokenCount:
+                        finalUsage.candidatesTokenCount || 0,
+                      promptTokenCount: finalUsage.promptTokenCount || 0,
+                      totalTokenCount: finalUsage.totalTokenCount || 0,
                     }
                   : undefined,
-                sources: finalSources,
+                sources:
+                  finalSources && finalSources.length > 0
+                    ? finalSources
+                    : undefined,
               }
             : msg
         )
@@ -803,37 +1071,7 @@ export const ChatInterface: React.FC = () => {
                   <h3 className="px-3 text-[10px] md:text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4">
                     Recent
                   </h3>
-                  {sidebarSessions.map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => {
-                        navigate(`/chat/${session.id}`, { replace: true });
-                        setIsDesktopSidebarCollapsed(true); // Collapse sidebar on desktop
-                        // Only close on mobile, keep open on desktop
-                        if (window.innerWidth < 1024) {
-                          setIsSidebarOpen(false);
-                        }
-                      }}
-                      className={`flex flex-col w-full px-3 py-2.5 rounded-xl text-left transition-all group ${
-                        sessionId === session.id
-                          ? "bg-ink text-white shadow-lg"
-                          : "bg-white text-ink border border-slate-100 hover:bg-slate-50 hover:shadow-sm"
-                      }`}
-                    >
-                      <div className="text-sm truncate w-full font-medium">
-                        {session.title || "New Chat"}
-                      </div>
-                      <div
-                        className={`text-[10px] truncate w-full mt-0.5 ${
-                          sessionId === session.id
-                            ? "text-slate-300"
-                            : "text-slate-400"
-                        }`}
-                      >
-                        {new Date(session.lastUpdated).toLocaleDateString()}
-                      </div>
-                    </button>
-                  ))}
+                  {memoizedSidebarSessions}
                   {sidebarSessions.length === 0 && (
                     <div className="px-3 text-slate-400 text-xs italic">
                       No history yet
@@ -870,35 +1108,7 @@ export const ChatInterface: React.FC = () => {
                       />
                     </svg>
                   </button>
-                  {sidebarSessions.slice(0, 5).map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => {
-                        navigate(`/chat/${session.id}`, { replace: true });
-                        setIsDesktopSidebarCollapsed(true); // Keep collapsed when selecting chat
-                      }}
-                      className={`p-2 rounded-xl transition-all ${
-                        sessionId === session.id
-                          ? "bg-ink text-white shadow-lg"
-                          : "bg-white text-ink border border-slate-100 hover:bg-slate-50"
-                      }`}
-                      title={session.title || "New Chat"}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                        />
-                      </svg>
-                    </button>
-                  ))}
+                  {memoizedCollapsedSidebarSessions}
                 </div>
               )}
             </div>
@@ -1070,129 +1280,7 @@ export const ChatInterface: React.FC = () => {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4 lg:space-y-6 bg-canvas custom-scrollbar min-h-0 overscroll-contain">
-              {messages.map((msg, index) => {
-                if (msg.isSystem) {
-                  return (
-                    <div
-                      key={msg.id}
-                      className="flex w-full justify-center opacity-0 animate-enter"
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animationFillMode: "forwards",
-                      }}
-                    >
-                      <span className="px-3 py-1 bg-slate-50 text-ink-muted/60 text-[10px] font-mono uppercase tracking-widest rounded-full border border-slate-100">
-                        {msg.text}
-                      </span>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex w-full opacity-0 animate-enter ${
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    }`}
-                    style={{
-                      animationDelay: `${index * 50}ms`,
-                      animationFillMode: "forwards",
-                    }}
-                  >
-                    <div className="flex flex-col max-w-[90%] lg:max-w-[85%]">
-                      {/* Label */}
-                      <span
-                        className={`text-[9px] lg:text-[10px] font-mono uppercase mb-1 ${
-                          msg.role === "user"
-                            ? "text-right text-slate-400"
-                            : "text-left text-accent"
-                        }`}
-                      >
-                        {msg.role === "user"
-                          ? "You"
-                          : msg.isError
-                          ? "Error"
-                          : "AI"}
-                      </span>
-
-                      {/* Bubble */}
-                      <div
-                        className={`
-                  px-4 lg:px-5 py-3 lg:py-4 text-sm leading-relaxed shadow-sm
-                  ${
-                    msg.role === "user"
-                      ? "bg-white border border-slate-200 text-ink rounded-2xl lg:rounded-3xl rounded-br-lg"
-                      : msg.isError
-                      ? "bg-red-50 text-red-800 border border-red-100 rounded-2xl lg:rounded-3xl rounded-bl-lg"
-                      : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-bl-lg"
-                  }
-                `}
-                      >
-                        {msg.role === "user" ? (
-                          msg.text
-                        ) : (
-                          <MarkdownRenderer
-                            content={msg.text}
-                            className={
-                              msg.isError ? "text-red-800 prose-red" : ""
-                            }
-                          />
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] text-slate-300 mt-1 px-2 ${
-                          msg.role === "user" ? "text-right" : "text-left"
-                        }`}
-                      >
-                        {new Date(msg.timestamp).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
-                      </span>
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div className="mt-2 px-2">
-                          <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
-                            Sources:
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            {msg.sources.map((source, idx) => (
-                              <a
-                                key={idx}
-                                href={source.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-[11px] text-indigo-600 hover:text-indigo-800 underline truncate"
-                              >
-                                {source.title || source.url}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {msg.usage &&
-                        msg.role === "model" &&
-                        !msg.isError &&
-                        !msg.isAdminReply && (
-                          <div className="mt-1 ml-2 font-mono text-[10px] text-slate-400 flex items-center gap-3">
-                            <span>
-                              {msg.usage.candidatesTokenCount || 0} output
-                            </span>
-                            {msg.usage.thoughtsTokenCount &&
-                              msg.usage.thoughtsTokenCount > 0 && (
-                                <span className="text-accent">
-                                  • {msg.usage.thoughtsTokenCount} thoughts
-                                </span>
-                              )}
-                            {msg.usage.totalTokenCount && (
-                              <span>• {msg.usage.totalTokenCount} total</span>
-                            )}
-                          </div>
-                        )}
-                    </div>
-                  </div>
-                );
-              })}
+              {memoizedMessages}
 
               {/* Loading Indicator */}
               {isLoading && (

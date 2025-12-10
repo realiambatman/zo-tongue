@@ -4,10 +4,19 @@ import { SupportedLanguage, StudyData } from "../types";
 // In production, set VITE_API_URL environment variable to your backend URL
 // Example: VITE_API_URL=https://api.sensix.gensifts.com/api/chat
 // Or if backend is on same domain: VITE_API_URL=/api/chat
-const getApiBaseUrl = () => {
+// Optimize: cache the API base URL to avoid recomputing on every module load
+let cachedApiBaseUrl: string | null = null;
+
+const getApiBaseUrl = (): string => {
+  // Return cached value if available
+  if (cachedApiBaseUrl !== null) {
+    return cachedApiBaseUrl;
+  }
+
   // Use environment variable if set
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    cachedApiBaseUrl = import.meta.env.VITE_API_URL;
+    return cachedApiBaseUrl;
   }
 
   // In production (not localhost), try to use same origin
@@ -26,11 +35,13 @@ const getApiBaseUrl = () => {
         "If backend is on different domain, set VITE_API_URL environment variable"
       );
     }
-    return productionUrl;
+    cachedApiBaseUrl = productionUrl;
+    return cachedApiBaseUrl;
   }
 
   // Development: default to localhost
-  return "http://localhost:3001/api/chat";
+  cachedApiBaseUrl = "http://localhost:3001/api/chat";
+  return cachedApiBaseUrl;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -47,6 +58,7 @@ export interface ChatHistoryItem {
 export const apiClient = {
   /**
    * Send a message to the chat and get a response
+   * Optimized: supports request cancellation via AbortController
    */
   async sendChatMessage(
     message: string,
@@ -54,7 +66,8 @@ export const apiClient = {
     language: SupportedLanguage,
     sarcasmMode: boolean = false,
     useSearch: boolean = false,
-    currentDateTime?: string
+    currentDateTime?: string,
+    signal?: AbortSignal
   ): Promise<{
     text: string;
     usage?: any;
@@ -73,25 +86,51 @@ export const apiClient = {
         useSearch,
         currentDateTime,
       }),
+      signal, // Support request cancellation
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+      // Optimize: only parse JSON if response has content
+      let error: { error?: string } = { error: "Unknown error" };
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          error = await response.json();
+        } catch {
+          // Fallback to default error
+        }
+      }
+
+      // Handle 503 overload errors specially
+      if (response.status === 503) {
+        throw new Error(
+          error.error ||
+            "The AI service is temporarily overloaded. Please try again in a moment."
+        );
+      }
+
       throw new Error(error.error || "Failed to send message");
     }
 
-    return response.json();
+    const result = await response.json();
+
+    // Validate response has text
+    if (!result.text || result.text.trim().length === 0) {
+      throw new Error("AI generated empty response. Please try again.");
+    }
+
+    return result;
   },
 
   /**
    * Translate text from one language to another
+   * Optimized: supports request cancellation
    */
   async translateText(
     text: string,
     sourceLang: SupportedLanguage,
-    targetLang: SupportedLanguage
+    targetLang: SupportedLanguage,
+    signal?: AbortSignal
   ): Promise<{ text: string; usage?: any }> {
     const response = await fetch(`${API_BASE_URL}/translate`, {
       method: "POST",
@@ -103,12 +142,20 @@ export const apiClient = {
         sourceLang,
         targetLang,
       }),
+      signal, // Support request cancellation
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+      // Optimize: only parse JSON if response has content
+      let error: { error?: string } = { error: "Unknown error" };
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          error = await response.json();
+        } catch {
+          // Fallback to default error
+        }
+      }
       throw new Error(error.error || "Failed to translate text");
     }
 
@@ -117,10 +164,12 @@ export const apiClient = {
 
   /**
    * Generate study material from text
+   * Optimized: supports request cancellation
    */
   async generateStudyMaterial(
     text: string,
-    targetLang: SupportedLanguage
+    targetLang: SupportedLanguage,
+    signal?: AbortSignal
   ): Promise<{ data: StudyData; usage?: any }> {
     const response = await fetch(`${API_BASE_URL}/study`, {
       method: "POST",
@@ -131,12 +180,20 @@ export const apiClient = {
         text,
         targetLang,
       }),
+      signal, // Support request cancellation
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+      // Optimize: only parse JSON if response has content
+      let error: { error?: string } = { error: "Unknown error" };
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          error = await response.json();
+        } catch {
+          // Fallback to default error
+        }
+      }
       throw new Error(error.error || "Failed to generate study material");
     }
 
@@ -145,12 +202,14 @@ export const apiClient = {
 
   /**
    * Solve multimodal problems (with optional image)
+   * Optimized: supports request cancellation
    */
   async solveMultimodal(
     imageBase64: string | null,
     mimeType: string | null,
     question: string,
-    outputLanguage: SupportedLanguage
+    outputLanguage: SupportedLanguage,
+    signal?: AbortSignal
   ): Promise<{ text: string; usage?: any }> {
     const response = await fetch(`${API_BASE_URL}/solve`, {
       method: "POST",
@@ -163,12 +222,20 @@ export const apiClient = {
         question,
         outputLanguage,
       }),
+      signal, // Support request cancellation
     });
 
     if (!response.ok) {
-      const error = await response
-        .json()
-        .catch(() => ({ error: "Unknown error" }));
+      // Optimize: only parse JSON if response has content
+      let error: { error?: string } = { error: "Unknown error" };
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          error = await response.json();
+        } catch {
+          // Fallback to default error
+        }
+      }
       throw new Error(error.error || "Failed to solve problem");
     }
 

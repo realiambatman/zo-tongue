@@ -114,19 +114,64 @@ export const saveChatSession = async (session: ChatSession) => {
       const cleaned: ChatMessage = {
         id: msg.id,
         role: msg.role,
-        text: msg.text,
+        text: msg.text || "", // Ensure text is never undefined
         timestamp: msg.timestamp,
       };
 
-      // Only include optional fields if they are defined
-      if (msg.isError !== undefined) cleaned.isError = msg.isError;
-      if (msg.isSystem !== undefined) cleaned.isSystem = msg.isSystem;
-      if (msg.isAdminReply !== undefined)
+      // Only include optional fields if they are defined and not null
+      if (msg.isError !== undefined && msg.isError !== null)
+        cleaned.isError = msg.isError;
+      if (msg.isSystem !== undefined && msg.isSystem !== null)
+        cleaned.isSystem = msg.isSystem;
+      if (msg.isAdminReply !== undefined && msg.isAdminReply !== null)
         cleaned.isAdminReply = msg.isAdminReply;
-      if (msg.image !== undefined) cleaned.image = msg.image;
-      if (msg.usage !== undefined) cleaned.usage = msg.usage;
-      if (msg.sources !== undefined) cleaned.sources = msg.sources;
-      if (msg.isSearching !== undefined) cleaned.isSearching = msg.isSearching;
+      if (msg.image !== undefined && msg.image !== null)
+        cleaned.image = msg.image;
+
+      // Clean usage object to remove undefined values
+      if (msg.usage !== undefined && msg.usage !== null) {
+        const cleanedUsage: any = {};
+        if (
+          msg.usage.thoughtsTokenCount !== undefined &&
+          msg.usage.thoughtsTokenCount !== null
+        )
+          cleanedUsage.thoughtsTokenCount = msg.usage.thoughtsTokenCount;
+        if (
+          msg.usage.candidatesTokenCount !== undefined &&
+          msg.usage.candidatesTokenCount !== null
+        )
+          cleanedUsage.candidatesTokenCount = msg.usage.candidatesTokenCount;
+        if (
+          msg.usage.promptTokenCount !== undefined &&
+          msg.usage.promptTokenCount !== null
+        )
+          cleanedUsage.promptTokenCount = msg.usage.promptTokenCount;
+        if (
+          msg.usage.totalTokenCount !== undefined &&
+          msg.usage.totalTokenCount !== null
+        )
+          cleanedUsage.totalTokenCount = msg.usage.totalTokenCount;
+        if (Object.keys(cleanedUsage).length > 0) {
+          cleaned.usage = cleanedUsage;
+        }
+      }
+
+      // Clean sources array
+      if (
+        msg.sources !== undefined &&
+        msg.sources !== null &&
+        Array.isArray(msg.sources)
+      ) {
+        const cleanedSources = msg.sources
+          .filter((s) => s && s.title && s.url)
+          .map((s) => ({ title: s.title, url: s.url }));
+        if (cleanedSources.length > 0) {
+          cleaned.sources = cleanedSources;
+        }
+      }
+
+      if (msg.isSearching !== undefined && msg.isSearching !== null)
+        cleaned.isSearching = msg.isSearching;
 
       return cleaned;
     });
@@ -135,29 +180,49 @@ export const saveChatSession = async (session: ChatSession) => {
     const cleanedSession: any = {
       id: session.id,
       userId: session.userId,
-      title: session.title,
+      title: session.title || "New Chat", // Ensure title is never undefined
       language: session.language,
       startTime: session.startTime,
       lastUpdated: Date.now(),
       messages: cleanedMessages,
-      isAnonymous: session.isAnonymous,
+      isAnonymous:
+        session.isAnonymous !== undefined ? session.isAnonymous : false,
     };
 
-    // Only include optional fields if they are defined
+    // Only include optional fields if they are defined and not null
     if (session.userEmail !== undefined && session.userEmail !== null) {
       cleanedSession.userEmail = session.userEmail;
     }
-    if (session.isAiPaused !== undefined) {
+    if (session.isAiPaused !== undefined && session.isAiPaused !== null) {
       cleanedSession.isAiPaused = session.isAiPaused;
     }
-    if (session.type !== undefined) {
+    if (session.type !== undefined && session.type !== null) {
       cleanedSession.type = session.type;
     }
     if (session.ipAddress !== undefined && session.ipAddress !== null) {
       cleanedSession.ipAddress = session.ipAddress;
     }
 
-    await setDoc(sessionRef, cleanedSession, { merge: true });
+    // Remove any remaining undefined values recursively
+    const removeUndefined = (obj: any): any => {
+      if (obj === null || obj === undefined) return null;
+      if (Array.isArray(obj)) {
+        return obj.map(removeUndefined).filter((item) => item !== undefined);
+      }
+      if (typeof obj === "object") {
+        const cleaned: any = {};
+        for (const key in obj) {
+          if (obj[key] !== undefined) {
+            cleaned[key] = removeUndefined(obj[key]);
+          }
+        }
+        return cleaned;
+      }
+      return obj;
+    };
+
+    const finalCleanedSession = removeUndefined(cleanedSession);
+    await setDoc(sessionRef, finalCleanedSession, { merge: true });
   } catch (error) {
     console.error("Error saving chat session:", error);
   }
@@ -314,6 +379,38 @@ export const toggleAiPause = async (sessionId: string, isPaused: boolean) => {
     );
   } catch (error) {
     console.error("Error toggling AI pause:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a specific message from a chat session
+ */
+export const deleteMessageFromSession = async (
+  sessionId: string,
+  messageId: string
+) => {
+  try {
+    const sessionRef = doc(db, "chats", sessionId);
+    const sessionSnap = await getDoc(sessionRef);
+
+    if (sessionSnap.exists()) {
+      const currentMessages = sessionSnap.data().messages || [];
+      const updatedMessages = currentMessages.filter(
+        (msg: ChatMessage) => msg.id !== messageId
+      );
+
+      await setDoc(
+        sessionRef,
+        {
+          messages: updatedMessages,
+          lastUpdated: Date.now(),
+        },
+        { merge: true }
+      );
+    }
+  } catch (error) {
+    console.error("Error deleting message from session:", error);
     throw error;
   }
 };
