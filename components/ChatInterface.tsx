@@ -12,6 +12,7 @@ import {
   isDateTimeQuery,
   isCurrentEventsQuery,
 } from "../services/geminiService";
+import { ChatHistoryItem } from "../services/apiClient";
 import { LanguageSelector } from "./LanguageSelector";
 import { Chat, Content } from "@google/genai";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -793,6 +794,15 @@ export const ChatInterface: React.FC = () => {
     }
 
     try {
+      // Build current history from messages state to ensure we use the latest history
+      // This prevents race conditions when multiple users are in the same session
+      const currentHistory: ChatHistoryItem[] = messages
+        .filter((m) => !m.isSystem && !m.isError)
+        .map((m) => ({
+          role: m.role === "user" ? "user" : "model",
+          parts: [{ text: m.text }],
+        }));
+
       // Type assertion needed because our SecureChatSession extends Chat interface
       const resultStream = await (
         chatSessionRef.current as any
@@ -800,6 +810,7 @@ export const ChatInterface: React.FC = () => {
         message: userText,
         useSearch: shouldUseSearch,
         currentDateTime: serverDateTime,
+        currentHistory: currentHistory, // Pass fresh history from messages state
       });
 
       // Create placeholder message for streaming response

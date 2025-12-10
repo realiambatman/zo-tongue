@@ -271,15 +271,20 @@ class SecureChatSession {
     message: string;
     useSearch?: boolean;
     currentDateTime?: string;
+    currentHistory?: ChatHistoryItem[]; // Allow passing fresh history from database
   }): Promise<AsyncGenerator<any, void, unknown>> {
     const userMessage: ChatHistoryItem = {
       role: "user",
       parts: [{ text: options.message }],
     };
 
+    // Use provided current history if available (from database), otherwise use local history
+    // This ensures we always use the latest history when multiple users are in the same session
+    const baseHistory = options.currentHistory || this.history;
+
     // Create a snapshot of history at this point to avoid race conditions with concurrent messages
     // This ensures each message gets the correct context even if multiple are sent simultaneously
-    const historySnapshot = [...this.history];
+    const historySnapshot = [...baseHistory];
 
     // Clean the history snapshot to ensure no empty/invalid items are sent to backend
     const cleanedHistory = cleanHistory(historySnapshot);
@@ -304,10 +309,18 @@ class SecureChatSession {
       parts: [{ text: response.text }],
     };
 
-    // Use a simple append strategy - in a real concurrent scenario, you might want
-    // to use a queue or lock, but for most use cases this works fine
-    this.history.push(userMessage);
-    this.history.push(modelMessage);
+    // Update local history to stay in sync
+    // If we used currentHistory from options, merge it with the new messages
+    // Otherwise, just append to existing history
+    if (options.currentHistory) {
+      // Replace history with the provided history + new messages
+      this.history = [...options.currentHistory, userMessage, modelMessage];
+    } else {
+      // Use a simple append strategy - in a real concurrent scenario, you might want
+      // to use a queue or lock, but for most use cases this works fine
+      this.history.push(userMessage);
+      this.history.push(modelMessage);
+    }
 
     // Simulate streaming by yielding text character by character
     // Fixed: Yield ONLY new characters, UI will accumulate
