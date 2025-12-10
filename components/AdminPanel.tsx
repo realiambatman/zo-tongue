@@ -7,6 +7,8 @@ import {
   toggleAiPause,
   deleteChatSession,
   deleteMessageFromSession,
+  subscribeToMaintenanceMode,
+  setMaintenanceMode,
   ChatSession,
   UserProfile,
 } from "../services/dbService";
@@ -34,6 +36,7 @@ export const AdminPanel: React.FC = () => {
   );
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
 
   // Admin check: Allow access if email ends with @buildnbit.com
   // Only check after auth has finished loading to prevent false "Access Denied" flash
@@ -121,6 +124,7 @@ export const AdminPanel: React.FC = () => {
   useEffect(() => {
     let unsubscribeSessions: () => void;
     let unsubscribeUsers: () => void;
+    let unsubscribeMaintenance: () => void;
 
     // Only proceed if auth has finished loading and user is confirmed admin
     if (isAdmin === true) {
@@ -138,6 +142,10 @@ export const AdminPanel: React.FC = () => {
       unsubscribeUsers = subscribeToAllUsers((allUsers) => {
         setUsers(allUsers);
       });
+
+      unsubscribeMaintenance = subscribeToMaintenanceMode((isEnabled) => {
+        setIsMaintenanceMode(isEnabled);
+      });
     } else if (isAdmin === false) {
       // Auth finished but user is not admin
       setLoading(false);
@@ -147,6 +155,7 @@ export const AdminPanel: React.FC = () => {
     return () => {
       if (unsubscribeSessions) unsubscribeSessions();
       if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeMaintenance) unsubscribeMaintenance();
     };
   }, [isAdmin, selectedSession?.id]); // Re-subscribe if needed, but mainly just handle updates
 
@@ -294,28 +303,64 @@ export const AdminPanel: React.FC = () => {
               Admin Dashboard • {sessions.length} Total Sessions
             </p>
           </div>
-          {/* Mobile close button */}
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="lg:hidden p-2 bg-white rounded-full shadow-sm border border-slate-200 text-slate-500 hover:text-ink transition-colors"
-              title="Close"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="flex items-center gap-3">
+            {/* Maintenance Mode Toggle */}
+            <div className="flex items-center gap-2 bg-white rounded-xl px-4 py-2 border border-slate-200 shadow-sm">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                Maintenance
+              </span>
+              <button
+                onClick={async () => {
+                  const newValue = !isMaintenanceMode;
+                  try {
+                    await setMaintenanceMode(newValue, user?.email || "admin");
+                    setIsMaintenanceMode(newValue);
+                  } catch (error) {
+                    console.error("Failed to toggle maintenance mode:", error);
+                    alert("Failed to toggle maintenance mode");
+                  }
+                }}
+                className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                  isMaintenanceMode ? "bg-red-500" : "bg-slate-200"
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
+                <div
+                  className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-300 ${
+                    isMaintenanceMode ? "left-6" : "left-0.5"
+                  }`}
+                ></div>
+              </button>
+              <span
+                className={`text-xs font-bold ${
+                  isMaintenanceMode ? "text-red-600" : "text-slate-400"
+                }`}
+              >
+                {isMaintenanceMode ? "ON" : "OFF"}
+              </span>
+            </div>
+            {/* Mobile close button */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="lg:hidden p-2 bg-white rounded-full shadow-sm border border-slate-200 text-slate-500 hover:text-ink transition-colors"
+                title="Close"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 flex-1 min-h-0 pb-4 lg:pb-8">

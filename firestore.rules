@@ -39,6 +39,24 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Rules for Settings Collection (Maintenance Mode, etc.)
+    match /settings/{settingId} {
+      // Everyone can read settings (needed to check maintenance mode)
+      allow read: if true;
+      // Only admins can write/update settings
+      allow write: if isAdmin();
+    }
+
+    // Rules for Sessions Collection (legacy/alternative path)
+    match /sessions/{sessionId} {
+      // Admins can read/write everything
+      allow read, write: if isAdmin();
+      // ALLOW create for everyone (including unauthenticated guests)
+      allow create: if true;
+      // ALLOW read/update for everyone (to support unauthenticated guest persistence)
+      allow read, update: if true;
+    }
+
     // Default deny for other collections
     match /{document=**} {
       allow read, write: if false;

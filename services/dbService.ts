@@ -429,3 +429,75 @@ export const fetchUserIP = async (): Promise<string | null> => {
     return null;
   }
 };
+
+/**
+ * Site maintenance mode functions
+ */
+const MAINTENANCE_DOC_ID = "site_maintenance";
+
+export interface MaintenanceSettings {
+  isEnabled: boolean;
+  lastUpdated: number;
+  updatedBy?: string;
+}
+
+/**
+ * Get current maintenance mode status
+ */
+export const getMaintenanceMode = async (): Promise<boolean> => {
+  try {
+    const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
+    const maintenanceDoc = await getDoc(maintenanceRef);
+
+    if (!maintenanceDoc.exists()) {
+      return false; // Default to not in maintenance
+    }
+
+    const data = maintenanceDoc.data() as MaintenanceSettings;
+    return data.isEnabled || false;
+  } catch (error) {
+    console.error("Error getting maintenance mode:", error);
+    return false; // Default to not in maintenance on error
+  }
+};
+
+/**
+ * Subscribe to maintenance mode changes
+ */
+export const subscribeToMaintenanceMode = (
+  callback: (isEnabled: boolean) => void
+): Unsubscribe => {
+  const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
+  return onSnapshot(maintenanceRef, (doc) => {
+    if (doc.exists()) {
+      const data = doc.data() as MaintenanceSettings;
+      callback(data.isEnabled || false);
+    } else {
+      callback(false);
+    }
+  });
+};
+
+/**
+ * Set maintenance mode
+ */
+export const setMaintenanceMode = async (
+  isEnabled: boolean,
+  updatedBy?: string
+): Promise<void> => {
+  try {
+    const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
+    await setDoc(
+      maintenanceRef,
+      {
+        isEnabled,
+        lastUpdated: Date.now(),
+        updatedBy: updatedBy || null,
+      } as MaintenanceSettings,
+      { merge: true }
+    );
+  } catch (error) {
+    console.error("Error setting maintenance mode:", error);
+    throw error;
+  }
+};
