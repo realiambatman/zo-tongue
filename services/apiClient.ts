@@ -52,8 +52,14 @@ export const apiClient = {
     message: string,
     history: ChatHistoryItem[],
     language: SupportedLanguage,
-    sarcasmMode: boolean = false
-  ): Promise<{ text: string; usage?: any }> {
+    sarcasmMode: boolean = false,
+    useSearch: boolean = false,
+    currentDateTime?: string
+  ): Promise<{
+    text: string;
+    usage?: any;
+    sources?: Array<{ title: string; url: string }>;
+  }> {
     const response = await fetch(`${API_BASE_URL}/chat/send`, {
       method: "POST",
       headers: {
@@ -64,6 +70,8 @@ export const apiClient = {
         history,
         language,
         sarcasmMode,
+        useSearch,
+        currentDateTime,
       }),
     });
 

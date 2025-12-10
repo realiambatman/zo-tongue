@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ChatMessage, SupportedLanguage } from "../types";
-import { createChatSession } from "../services/geminiService";
+import {
+  createChatSession,
+  fetchServerTime,
+  isDateTimeQuery,
+  isCurrentEventsQuery,
+} from "../services/geminiService";
 import { LanguageSelector } from "./LanguageSelector";
 import { Chat, Content } from "@google/genai";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -30,7 +35,13 @@ export const ChatInterface: React.FC = () => {
   );
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Keep for UI loading indicator
+  const [isSearching, setIsSearching] = useState(false);
+  const [processingMessages, setProcessingMessages] = useState<Set<string>>(
+    new Set()
+  ); // Track which messages are being processed
+  const [serverDate, setServerDate] = useState<string>(""); // Cached server date/time
+  const [isFetchingDate, setIsFetchingDate] = useState(false); // Track date fetch status
 
   // Use route param if available, otherwise null (new session)
   const [sessionId, setSessionId] = useState<string | null>(
@@ -63,6 +74,25 @@ export const ChatInterface: React.FC = () => {
     localStorage.setItem("zotongue_guest_id", newId);
     return newId;
   });
+
+  // Initialize server date on mount (similar to GovJobsPage pattern)
+  useEffect(() => {
+    const initializeServerDate = async () => {
+      setIsFetchingDate(true);
+      try {
+        const date = await fetchServerTime();
+        setServerDate(date);
+      } catch (error) {
+        console.warn(
+          "Failed to fetch server time on mount, will retry when needed"
+        );
+        // Don't set serverDate, will use local time fallback
+      } finally {
+        setIsFetchingDate(false);
+      }
+    };
+    initializeServerDate();
+  }, []);
 
   // Initialize session: Load existing or create new
   useEffect(() => {
@@ -408,7 +438,8 @@ export const ChatInterface: React.FC = () => {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!inputValue.trim() || isLoading || !chatSessionRef.current) return;
+    // Allow sending multiple messages simultaneously - only check if input is empty or session exists
+    if (!inputValue.trim() || !chatSessionRef.current) return;
 
     // Allow sending if user OR guestId is present
     if (!user && !guestId) {
@@ -419,15 +450,17 @@ export const ChatInterface: React.FC = () => {
     const userText = inputValue.trim();
     setInputValue("");
 
+    const userMsgId = Date.now().toString();
     const userMsg: ChatMessage = {
-      id: Date.now().toString(),
+      id: userMsgId,
       role: "user",
       text: userText,
       timestamp: Date.now(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
+    setProcessingMessages((prev) => new Set(prev).add(userMsgId));
+    setIsLoading(true); // Keep for overall loading indicator
 
     // Create session lazily on first real message (pass current language)
     const sessionResult = await ensureSessionExists(selectedLanguage);
@@ -452,19 +485,63 @@ export const ChatInterface: React.FC = () => {
 
     // If AI is paused (Admin active), skip generating response
     if (isAiPaused) {
+      setProcessingMessages((prev) => {
+        const next = new Set(prev);
+        next.delete(userMsgId);
+        return next;
+      });
       setIsLoading(false);
       return;
     }
 
+    // Detect if this is a date/time or current events query
+    const needsServerTime = isDateTimeQuery(userText);
+    const needsSearch = isCurrentEventsQuery(userText);
+
+    let serverDateTime: string | undefined;
+    if (needsServerTime) {
+      // Use cached serverDate if available, otherwise fetch fresh
+      if (serverDate) {
+        serverDateTime = serverDate;
+      } else {
+        // Fetch fresh if not cached (fallback scenario)
+        setIsFetchingDate(true);
+        try {
+          const date = await fetchServerTime();
+          setServerDate(date);
+          serverDateTime = date;
+        } catch (error) {
+          console.warn(
+            "Failed to fetch server time, using local time fallback"
+          );
+          // Will use undefined, backend will use local time
+        } finally {
+          setIsFetchingDate(false);
+        }
+      }
+    }
+
+    // Show searching indicator if needed
+    if (needsSearch) {
+      setIsSearching(true);
+    }
+
     try {
-      const resultStream = await chatSessionRef.current.sendMessageStream({
+      // Type assertion needed because our SecureChatSession extends Chat interface
+      const resultStream = await (
+        chatSessionRef.current as any
+      ).sendMessageStream({
         message: userText,
+        useSearch: needsSearch,
+        currentDateTime: serverDateTime,
       });
 
       // Create placeholder message for streaming response
       const botMsgId = (Date.now() + 1).toString();
       let fullResponseText = "";
       let finalUsage = undefined;
+      let finalSources: Array<{ title: string; url: string }> | undefined =
+        undefined;
 
       setMessages((prev) => [
         ...prev,
@@ -484,8 +561,12 @@ export const ChatInterface: React.FC = () => {
           fullResponseText += chunkText;
         }
 
-        if (chunk.usageMetadata) {
-          finalUsage = chunk.usageMetadata;
+        if ((chunk as any).usageMetadata) {
+          finalUsage = (chunk as any).usageMetadata;
+        }
+
+        if ((chunk as any).sources) {
+          finalSources = (chunk as any).sources;
         }
 
         // Update the message with accumulated text
@@ -496,7 +577,7 @@ export const ChatInterface: React.FC = () => {
         );
       }
 
-      // Final update with usage metadata
+      // Final update with usage metadata and sources
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === botMsgId
@@ -513,10 +594,27 @@ export const ChatInterface: React.FC = () => {
                       totalTokenCount: finalUsage.totalTokenCount,
                     }
                   : undefined,
+                sources: finalSources,
               }
             : msg
         )
       );
+
+      // Clear searching indicator
+      setIsSearching(false);
+      // Remove from processing set
+      setProcessingMessages((prev) => {
+        const next = new Set(prev);
+        next.delete(userMsgId);
+        return next;
+      });
+      // Only set isLoading to false if no other messages are processing
+      setProcessingMessages((current) => {
+        if (current.size === 0) {
+          setIsLoading(false);
+        }
+        return current;
+      });
     } catch (error) {
       console.error("Chat error", error);
       setMessages((prev) => [
@@ -529,8 +627,16 @@ export const ChatInterface: React.FC = () => {
           isError: true,
         },
       ]);
-    } finally {
-      setIsLoading(false);
+      setIsSearching(false);
+      // Remove from processing set on error
+      setProcessingMessages((prev) => {
+        const next = new Set(prev);
+        next.delete(userMsgId);
+        if (next.size === 0) {
+          setIsLoading(false);
+        }
+        return next;
+      });
     }
   };
 
@@ -847,9 +953,27 @@ export const ChatInterface: React.FC = () => {
                 <h2 className="font-display text-base lg:text-lg font-bold text-ink truncate">
                   Native Chat
                 </h2>
-                <p className="font-mono text-[10px] lg:text-xs text-slate-500 font-mono uppercase tracking-widest truncate">
-                  Speaking: {selectedLanguage}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-[10px] lg:text-xs text-slate-500 font-mono uppercase tracking-widest truncate">
+                    Speaking: {selectedLanguage}
+                  </p>
+                  {serverDate && (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/80 border border-slate-200 rounded-full">
+                      <div
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isFetchingDate
+                            ? "bg-amber-500 animate-pulse"
+                            : "bg-emerald-500"
+                        }`}
+                      ></div>
+                      <span className="text-[9px] font-mono text-slate-600">
+                        {isFetchingDate
+                          ? "SYNC..."
+                          : new Date(serverDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 {/* Sarcasm Toggle - Professional Switch */}
@@ -1011,6 +1135,26 @@ export const ChatInterface: React.FC = () => {
                           hour12: true,
                         })}
                       </span>
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-2 px-2">
+                          <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
+                            Sources:
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {msg.sources.map((source, idx) => (
+                              <a
+                                key={idx}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] text-indigo-600 hover:text-indigo-800 underline truncate"
+                              >
+                                {source.title || source.url}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {msg.usage &&
                         msg.role === "model" &&
                         !msg.isError &&
@@ -1043,20 +1187,47 @@ export const ChatInterface: React.FC = () => {
                       AI
                     </span>
                     <div className="bg-slate-100 border border-slate-200 px-4 lg:px-5 py-3 lg:py-4 rounded-2xl lg:rounded-3xl rounded-bl-lg shadow-sm flex items-center gap-2">
-                      <div className="flex gap-1.5">
-                        <div
-                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                          style={{ animationDelay: "0ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                          style={{ animationDelay: "150ms" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-accent rounded-full animate-bounce"
-                          style={{ animationDelay: "300ms" }}
-                        ></div>
-                      </div>
+                      {isSearching ? (
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className="w-4 h-4 text-indigo-600 animate-spin"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                            ></circle>
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            ></path>
+                          </svg>
+                          <span className="text-[11px] text-indigo-600 font-medium">
+                            Searching internet...
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          <div
+                            className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                            style={{ animationDelay: "0ms" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                            style={{ animationDelay: "150ms" }}
+                          ></div>
+                          <div
+                            className="w-2 h-2 bg-accent rounded-full animate-bounce"
+                            style={{ animationDelay: "300ms" }}
+                          ></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

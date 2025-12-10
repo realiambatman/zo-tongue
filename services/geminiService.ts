@@ -2,6 +2,116 @@ import { Chat, Content } from "@google/genai";
 import { SupportedLanguage, StudyData } from "../types";
 import { apiClient, ChatHistoryItem } from "./apiClient";
 
+// Fetch real-time data from a time server to prevent stale client-side dates
+export const fetchServerTime = async (): Promise<string> => {
+  try {
+    // Set a short timeout to ensure the UI doesn't hang if the time API is slow
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    const response = await fetch(
+      "https://worldtimeapi.org/api/timezone/Asia/Kolkata",
+      {
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timeoutId);
+    if (response.ok) {
+      const data = await response.json();
+      // Return full datetime string in ISO format
+      return data.datetime;
+    }
+  } catch (error) {
+    console.warn("Failed to fetch server time, falling back to local time.");
+  }
+
+  // Fallback to local system time if API fails
+  return new Date().toISOString();
+};
+
+// Helper to detect if query is about date/time
+export const isDateTimeQuery = (query: string): boolean => {
+  const lowerQuery = query.toLowerCase();
+  const dateTimeKeywords = [
+    "date",
+    "time",
+    "today",
+    "now",
+    "current date",
+    "current time",
+    "what day",
+    "what time",
+    "when is",
+    "what is the date",
+    "what is the time",
+    "date today",
+    "time now",
+    "current day",
+    "day today",
+    "year",
+    "month",
+    "week",
+    "hour",
+    "minute",
+  ];
+  return dateTimeKeywords.some((keyword) => lowerQuery.includes(keyword));
+};
+
+// Helper to detect if query is about current events/news
+export const isCurrentEventsQuery = (query: string): boolean => {
+  const lowerQuery = query.toLowerCase();
+  const currentEventsKeywords = [
+    "news",
+    "latest",
+    "recent",
+    "current events",
+    "happening now",
+    "what happened",
+    "breaking",
+    "today's news",
+    "current news",
+    "recent news",
+    "latest news",
+    "what's happening",
+    "what happened today",
+    "current affairs",
+    "recent events",
+    "latest updates",
+    "breaking news",
+    "today news",
+    "news today",
+    "what's new",
+    "what is happening",
+    "current situation",
+    "recent developments",
+  ];
+  return currentEventsKeywords.some((keyword) => lowerQuery.includes(keyword));
+};
+
+/**
+ * Helper function to clean and validate chat history
+ * Filters out items with empty parts or empty text strings
+ */
+const cleanHistory = (history: ChatHistoryItem[]): ChatHistoryItem[] => {
+  return history
+    .filter((item) => {
+      // Filter out items with no parts or empty parts array
+      if (!item.parts || item.parts.length === 0) return false;
+      // Keep items that have at least one part with non-empty text
+      return item.parts.some(
+        (part) => part.text && part.text.trim().length > 0
+      );
+    })
+    .map((item) => ({
+      role: item.role,
+      // Filter out empty text parts within each item
+      parts: item.parts.filter(
+        (part) => part.text && part.text.trim().length > 0
+      ),
+    }));
+};
+
 /**
  * SECURE: Chat session wrapper that uses the backend API
  * All API keys and system instructions are now on the server
@@ -23,41 +133,66 @@ class SecureChatSession {
       .toString(36)
       .substr(2, 9)}`;
 
-    // Convert Content[] to ChatHistoryItem[]
+    // Convert Content[] to ChatHistoryItem[] and clean invalid items
     if (history) {
-      this.history = history.map((item) => ({
-        role: item.role === "user" ? "user" : "model",
-        parts: item.parts?.map((p: any) => ({ text: p.text || "" })) || [
-          { text: "" },
-        ],
-      }));
+      const convertedHistory: ChatHistoryItem[] = history
+        .map((item) => ({
+          role: (item.role === "user" ? "user" : "model") as "user" | "model",
+          parts: item.parts?.map((p: any) => ({ text: p.text || "" })) || [
+            { text: "" },
+          ],
+        }))
+        .filter((item): item is ChatHistoryItem => {
+          return (
+            (item.role === "user" || item.role === "model") &&
+            Array.isArray(item.parts)
+          );
+        });
+      // Clean history to remove empty/invalid items
+      this.history = cleanHistory(convertedHistory);
     }
   }
 
   async sendMessageStream(options: {
     message: string;
+    useSearch?: boolean;
+    currentDateTime?: string;
   }): Promise<AsyncGenerator<any, void, unknown>> {
     const userMessage: ChatHistoryItem = {
       role: "user",
       parts: [{ text: options.message }],
     };
 
-    // Add user message to history
-    this.history.push(userMessage);
+    // Create a snapshot of history at this point to avoid race conditions with concurrent messages
+    // This ensures each message gets the correct context even if multiple are sent simultaneously
+    const historySnapshot = [...this.history];
 
-    // Call backend API
+    // Clean the history snapshot to ensure no empty/invalid items are sent to backend
+    const cleanedHistory = cleanHistory(historySnapshot);
+
+    // Add user message to the snapshot (not to main history yet)
+    const historyWithUserMessage = [...cleanedHistory, userMessage];
+
+    // Call backend API with the cleaned snapshot
     const response = await apiClient.sendChatMessage(
       options.message,
-      this.history.slice(0, -1), // Send history without the current message
+      cleanedHistory, // Send cleaned history snapshot without the current message
       this.language,
-      this.sarcasmMode
+      this.sarcasmMode,
+      options.useSearch || false,
+      options.currentDateTime
     );
 
-    // Add model response to history
+    // Add both user message and model response to main history atomically
+    // This ensures proper ordering even with concurrent requests
     const modelMessage: ChatHistoryItem = {
       role: "model",
       parts: [{ text: response.text }],
     };
+
+    // Use a simple append strategy - in a real concurrent scenario, you might want
+    // to use a queue or lock, but for most use cases this works fine
+    this.history.push(userMessage);
     this.history.push(modelMessage);
 
     // Simulate streaming by yielding text character by character
@@ -65,6 +200,7 @@ class SecureChatSession {
     async function* streamGenerator() {
       const fullText = response.text || "";
       const usageMetadata = response.usage;
+      const sources = response.sources;
 
       // Yield text in small chunks - each chunk contains ONLY new characters
       const chunkSize = 2;
@@ -81,13 +217,12 @@ class SecureChatSession {
         };
       }
 
-      // Final yield with usage metadata (no text)
-      if (usageMetadata) {
-        yield {
-          text: "",
-          usageMetadata: usageMetadata,
-        };
-      }
+      // Final yield with usage metadata and sources (no text)
+      yield {
+        text: "",
+        usageMetadata: usageMetadata,
+        sources: sources,
+      };
     }
 
     return streamGenerator();

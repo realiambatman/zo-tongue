@@ -108,14 +108,56 @@ export const subscribeToAllUsers = (
 export const saveChatSession = async (session: ChatSession) => {
   try {
     const sessionRef = doc(db, "chats", session.id);
-    await setDoc(
-      sessionRef,
-      {
-        ...session,
-        lastUpdated: Date.now(),
-      },
-      { merge: true }
-    );
+
+    // Clean messages to remove undefined values (Firestore doesn't allow undefined)
+    const cleanedMessages = session.messages.map((msg) => {
+      const cleaned: ChatMessage = {
+        id: msg.id,
+        role: msg.role,
+        text: msg.text,
+        timestamp: msg.timestamp,
+      };
+
+      // Only include optional fields if they are defined
+      if (msg.isError !== undefined) cleaned.isError = msg.isError;
+      if (msg.isSystem !== undefined) cleaned.isSystem = msg.isSystem;
+      if (msg.isAdminReply !== undefined)
+        cleaned.isAdminReply = msg.isAdminReply;
+      if (msg.image !== undefined) cleaned.image = msg.image;
+      if (msg.usage !== undefined) cleaned.usage = msg.usage;
+      if (msg.sources !== undefined) cleaned.sources = msg.sources;
+      if (msg.isSearching !== undefined) cleaned.isSearching = msg.isSearching;
+
+      return cleaned;
+    });
+
+    // Clean session object to remove undefined values
+    const cleanedSession: any = {
+      id: session.id,
+      userId: session.userId,
+      title: session.title,
+      language: session.language,
+      startTime: session.startTime,
+      lastUpdated: Date.now(),
+      messages: cleanedMessages,
+      isAnonymous: session.isAnonymous,
+    };
+
+    // Only include optional fields if they are defined
+    if (session.userEmail !== undefined && session.userEmail !== null) {
+      cleanedSession.userEmail = session.userEmail;
+    }
+    if (session.isAiPaused !== undefined) {
+      cleanedSession.isAiPaused = session.isAiPaused;
+    }
+    if (session.type !== undefined) {
+      cleanedSession.type = session.type;
+    }
+    if (session.ipAddress !== undefined && session.ipAddress !== null) {
+      cleanedSession.ipAddress = session.ipAddress;
+    }
+
+    await setDoc(sessionRef, cleanedSession, { merge: true });
   } catch (error) {
     console.error("Error saving chat session:", error);
   }

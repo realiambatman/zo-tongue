@@ -39,6 +39,8 @@ export interface ChatMessage {
     promptTokenCount?: number;
     totalTokenCount?: number;
   };
+  sources?: Array<{ title: string; url: string }>; // Sources from web search
+  isSearching?: boolean; // Visual indicator for search in progress
 }
 
 export interface TranslationResult {
