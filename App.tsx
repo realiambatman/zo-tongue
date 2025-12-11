@@ -28,7 +28,7 @@ const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean | null>(
     null
   ); // null = loading
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -65,17 +65,25 @@ const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
     };
   }, []);
 
-  // Allow admins to access admin panel even during maintenance
-  const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
+  // Always allow access to admin panel (let AdminPanel handle its own auth)
   const isAdminRoute = location.pathname === "/admin";
 
-  // Return null while checking to prevent any flash of content
+  // Check if user is admin (only after auth is loaded)
+  const isAdmin =
+    !authLoading && (user?.email?.endsWith("@buildnbit.com") ?? false);
+
+  // Always allow /admin route through - AdminPanel will handle its own authentication
+  if (isAdminRoute) {
+    return <>{children}</>;
+  }
+
+  // Return null while checking maintenance mode
   if (isMaintenanceMode === null) {
     return null;
   }
 
-  // Show maintenance page if enabled, unless user is admin accessing admin panel
-  if (isMaintenanceMode && !(isAdmin && isAdminRoute)) {
+  // Show maintenance page if enabled, unless user is admin
+  if (isMaintenanceMode && !isAdmin) {
     return <ServiceUnavailable />;
   }
 

@@ -284,6 +284,24 @@ export const ChatInterface: React.FC = () => {
     return () => unsubscribe();
   }, [sessionId]);
 
+  // Cleanup: Clear chat session when component unmounts or user navigates away
+  useEffect(() => {
+    return () => {
+      // Clear the chat session reference when component unmounts
+      // This helps prevent memory leaks and ensures sessions are properly cleaned up
+      chatSessionRef.current = null;
+    };
+  }, []);
+
+  // Cleanup: Clear chat session when component unmounts or user navigates away
+  useEffect(() => {
+    return () => {
+      // Clear the chat session reference when component unmounts
+      // This helps prevent memory leaks and ensures sessions are properly cleaned up
+      chatSessionRef.current = null;
+    };
+  }, []);
+
   // Keep sessionIdRef in sync with sessionId state
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -684,8 +702,8 @@ export const ChatInterface: React.FC = () => {
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    // Allow sending multiple messages simultaneously - only check if input is empty or session exists
-    if (!inputValue.trim() || !chatSessionRef.current) return;
+    // Allow sending multiple messages simultaneously - only check if input is empty
+    if (!inputValue.trim()) return;
 
     // Allow sending if user OR guestId is present
     if (!user && !guestId) {
@@ -710,6 +728,16 @@ export const ChatInterface: React.FC = () => {
 
     // Create session lazily on first real message (pass current language)
     const sessionResult = await ensureSessionExists(selectedLanguage);
+
+    // Ensure chatSessionRef is initialized if it doesn't exist
+    // This can happen if user sends a message before initChat() completes
+    if (!chatSessionRef.current) {
+      chatSessionRef.current = createChatSession(
+        selectedLanguage,
+        undefined,
+        sarcasmMode
+      );
+    }
 
     // Only save immediately if this is a NEWLY created session
     // (React state update for sessionId may not have completed yet)
