@@ -12,7 +12,7 @@ import {
   ChatSession,
   UserProfile,
 } from "../services/dbService";
-import { ChatMessage, SessionType } from "../types";
+import { ChatMessage, SessionType, SupportedLanguage } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 import { useNavigate } from "react-router-dom";
@@ -37,6 +37,76 @@ export const AdminPanel: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportLanguage, setExportLanguage] = useState<string>("All");
+
+  const downloadSFTData = () => {
+    const sessionsToExport = sessions.filter(
+      (s) => exportLanguage === "All" || s.language === exportLanguage
+    );
+
+    const sftData: { instruction: string; input: string; output: string }[] =
+      [];
+
+    sessionsToExport.forEach((session) => {
+      const msgs = session.messages;
+      for (let i = 0; i < msgs.length - 1; i++) {
+        const currentMsg = msgs[i];
+        const nextMsg = msgs[i + 1];
+
+        // Find pairs of User -> Model (or Admin)
+        // Skip system messages and errors
+        if (
+          currentMsg.role === "user" &&
+          !currentMsg.isSystem &&
+          !currentMsg.isError &&
+          (nextMsg.role === "model" || nextMsg.isAdminReply) &&
+          !nextMsg.isError
+        ) {
+          let instruction = "";
+          const lang = session.language || "English";
+          
+          switch (session.type) {
+            case SessionType.TRANSLATE:
+              instruction = `Translate the following text to ${lang}.`;
+              break;
+            case SessionType.STUDY:
+              instruction = `Help the user study the following topic in ${lang}.`;
+              break;
+            case SessionType.SOLVER:
+              instruction = `Solve the following problem. Explain in ${lang}.`;
+              break;
+            case SessionType.CHAT:
+            default:
+              instruction = `You are a helpful AI assistant in ${lang}.`;
+              break;
+          }
+
+          sftData.push({
+            instruction,
+            input: currentMsg.text,
+            output: nextMsg.text,
+          });
+        }
+      }
+    });
+
+    const jsonlContent = sftData.map((item) => JSON.stringify(item)).join("\n");
+    const blob = new Blob([jsonlContent], {
+      type: "application/jsonlines",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sft_data_${exportLanguage.toLowerCase().replace(/\s+/g, "_")}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.jsonl`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowExportModal(false);
+  };
 
   // Admin check: Allow access if email ends with @buildnbit.com
   // Only check after auth has finished loading to prevent false "Access Denied" flash
@@ -441,6 +511,31 @@ export const AdminPanel: React.FC = () => {
                 {isMaintenanceMode ? "ON" : "OFF"}
               </span>
             </div>
+            
+            {/* Export Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 bg-white rounded-xl px-4 py-2 border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors"
+              title="Export SFT Data"
+            >
+              <svg
+                className="w-5 h-5 text-indigo-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600 hidden sm:inline">
+                Export
+              </span>
+            </button>
+
             {/* Mobile close button */}
             {onBack && (
               <button
@@ -846,6 +941,52 @@ export const AdminPanel: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold text-ink mb-4">Export SFT Data</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              Export chat sessions in Instruction/Input/Output format for
+              fine-tuning.
+            </p>
+
+            <div className="mb-6">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Select Language
+              </label>
+              <select
+                value={exportLanguage}
+                onChange={(e) => setExportLanguage(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              >
+                <option value="All">All Languages</option>
+                {Object.values(SupportedLanguage).map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={downloadSFTData}
+                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+              >
+                Download JSONL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

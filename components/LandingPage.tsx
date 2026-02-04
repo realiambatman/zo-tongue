@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { AppMode } from "../types";
 import { useAuth } from "../contexts/AuthContext";
-import { Background3D } from "./Background3D";
 import { SignInModal } from "./SignInModal";
 // Removed useNavigate import as we use window.location for SSR-like feel
 
@@ -50,13 +49,6 @@ export const LandingPage: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const onProfile = () => (window.location.href = "/profile");
   const onAdmin = () => (window.location.href = "/admin");
-
-  // Initialize Background3D immediately on page load (hidden but running)
-  const [isBackgroundReady, setIsBackgroundReady] = useState(false);
-  useEffect(() => {
-    // Force Background3D to initialize immediately
-    setIsBackgroundReady(true);
-  }, []);
 
   // Navigation helper function
   const onNavigate = (mode: AppMode) => {
@@ -296,16 +288,6 @@ export const LandingPage: React.FC = () => {
           ======================================== */}
       {/* Navigation handled by global Layout/Navbar */}
 
-      {/* Pre-initialize Background3D (hidden but running) */}
-      {isBackgroundReady && (
-        <div
-          className="fixed inset-0 pointer-events-none opacity-0"
-          style={{ zIndex: -1 }}
-        >
-          <Background3D />
-        </div>
-      )}
-
       {/* Mobile Side Panel (Drawer) */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
@@ -468,15 +450,15 @@ export const LandingPage: React.FC = () => {
           ======================================== */}
       <div className="sticky top-0 z-0 w-full h-[100dvh] sm:h-screen min-h-[600px] sm:min-h-[700px]">
         <section className="absolute inset-0 bg-slate-300 overflow-hidden flex flex-col justify-center pt-20 sm:pt-20 pb-24 sm:pb-24">
-          {/* Atmospheric Background */}
+          {/* Atmospheric Background - static orbs for smooth scrolling */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {/* Soft gradient orbs - Enhanced for Mobile */}
-            <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/5 blur-[80px] animate-pulse-slow md:bg-accent/3 md:blur-[120px]"></div>
-            <div className="absolute top-1/4 -right-1/4 w-[70%] h-[70%] rounded-full bg-indigo-500/5 blur-[60px] animate-float md:w-[50%] md:h-[50%] md:bg-indigo-400/3 md:blur-[100px]"></div>
-            <div className="absolute -bottom-1/4 left-1/3 w-[60%] h-[60%] rounded-full bg-violet-500/5 blur-[80px] animate-float-delayed md:w-[40%] md:h-[40%] md:bg-violet-500/3"></div>
+            {/* Soft gradient orbs - no animation for smooth scroll */}
+            <div className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full bg-accent/5 blur-[80px] md:bg-accent/3 md:blur-[120px]"></div>
+            <div className="absolute top-1/4 -right-1/4 w-[70%] h-[70%] rounded-full bg-indigo-500/5 blur-[60px] md:w-[50%] md:h-[50%] md:bg-indigo-400/3 md:blur-[100px]"></div>
+            <div className="absolute -bottom-1/4 left-1/3 w-[60%] h-[60%] rounded-full bg-violet-500/5 blur-[80px] md:w-[40%] md:h-[40%] md:bg-violet-500/3"></div>
 
-            {/* Mobile Specific Animated Gradient Mesh */}
-            <div className="absolute inset-0 opacity-20 md:hidden bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.1),transparent_70%)] animate-pulse-slow"></div>
+            {/* Mobile gradient mesh - static */}
+            <div className="absolute inset-0 opacity-20 md:hidden bg-[radial-gradient(circle_at_50%_50%,rgba(76,29,149,0.1),transparent_70%)]"></div>
 
             {/* Subtle grid pattern */}
             <div
@@ -831,9 +813,6 @@ export const LandingPage: React.FC = () => {
           FEATURES SECTION - Magazine Grid
           ======================================== */}
       <div className="relative z-10 bg-canvas rounded-t-[4rem] mt-[-40px] pt-10 overflow-hidden">
-        {/* 3D Background Animation */}
-        <Background3D />
-
         <section id="features" className="py-3 relative z-10">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-12">
             {/* Section Header - Aligned Left for Editorial Feel */}
