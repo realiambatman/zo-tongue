@@ -39,11 +39,70 @@ export const AdminPanel: React.FC = () => {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportLanguage, setExportLanguage] = useState<string>("All");
+  const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
+    "messages"
+  );
+
+  const buildInstructionPrefix = (session: ChatSession): string => {
+    const lang = session.language || "English";
+    switch (session.type) {
+      case SessionType.TRANSLATE:
+        return `Translate the following text to ${lang}.`;
+      case SessionType.STUDY:
+        return `Help the user study the following topic in ${lang}.`;
+      case SessionType.SOLVER:
+        return `Solve the following problem. Explain in ${lang}.`;
+      case SessionType.CHAT:
+      default:
+        return `You are a helpful AI assistant in ${lang}.`;
+    }
+  };
 
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
     );
+
+    const langSlug = exportLanguage.toLowerCase().replace(/\s+/g, "_");
+    const dateSlug = new Date().toISOString().slice(0, 10);
+
+    if (exportFormat === "messages") {
+      const chatSessions = sessionsToExport.filter(
+        (s) => !s.type || s.type === SessionType.CHAT
+      );
+      const lines: string[] = [];
+      chatSessions.forEach((session) => {
+        const messages: { role: "user" | "assistant"; content: string }[] = [];
+        for (const msg of session.messages) {
+          if (msg.isError || msg.isSystem) continue;
+          const text = (msg.text || "").trim();
+          if (!text && !msg.image) continue;
+          const content = msg.text || "";
+          if (msg.role === "user") {
+            messages.push({ role: "user", content });
+          } else if (msg.role === "model" || msg.isAdminReply) {
+            messages.push({ role: "assistant", content });
+          }
+        }
+        if (messages.length === 0) return;
+        lines.push(JSON.stringify({ messages }));
+      });
+
+      const jsonlContent = lines.join("\n");
+      const blob = new Blob([jsonlContent], {
+        type: "application/jsonlines",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `chat_messages_${langSlug}_${dateSlug}.jsonl`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowExportModal(false);
+      return;
+    }
 
     const sftData: { instruction: string; input: string; output: string }[] =
       [];
@@ -54,8 +113,6 @@ export const AdminPanel: React.FC = () => {
         const currentMsg = msgs[i];
         const nextMsg = msgs[i + 1];
 
-        // Find pairs of User -> Model (or Admin)
-        // Skip system messages and errors
         if (
           currentMsg.role === "user" &&
           !currentMsg.isSystem &&
@@ -63,28 +120,15 @@ export const AdminPanel: React.FC = () => {
           (nextMsg.role === "model" || nextMsg.isAdminReply) &&
           !nextMsg.isError
         ) {
-          let instruction = "";
-          const lang = session.language || "English";
-          
-          switch (session.type) {
-            case SessionType.TRANSLATE:
-              instruction = `Translate the following text to ${lang}.`;
-              break;
-            case SessionType.STUDY:
-              instruction = `Help the user study the following topic in ${lang}.`;
-              break;
-            case SessionType.SOLVER:
-              instruction = `Solve the following problem. Explain in ${lang}.`;
-              break;
-            case SessionType.CHAT:
-            default:
-              instruction = `You are a helpful AI assistant in ${lang}.`;
-              break;
-          }
+          const prefix = buildInstructionPrefix(session);
+          const userText = currentMsg.text || "";
+          const instruction = userText.trim()
+            ? `${prefix}\n\n${userText}`.trim()
+            : prefix;
 
           sftData.push({
             instruction,
-            input: currentMsg.text,
+            input: "",
             output: nextMsg.text,
           });
         }
@@ -98,9 +142,7 @@ export const AdminPanel: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sft_data_${exportLanguage.toLowerCase().replace(/\s+/g, "_")}_${new Date()
-      .toISOString()
-      .slice(0, 10)}.jsonl`;
+    a.download = `sft_data_${langSlug}_${dateSlug}.jsonl`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -945,16 +987,38 @@ export const AdminPanel: React.FC = () => {
       {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold text-ink mb-4">Export SFT Data</h3>
-            <p className="text-sm text-slate-500 mb-6">
-              Export chat sessions in Instruction/Input/Output format for
-              fine-tuning.
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold text-ink mb-4">Export training data</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              <strong>Chat messages</strong>: one JSON object per line with{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">messages</code>{" "}
+              (user / assistant). CHAT sessions only.
             </p>
+            <p className="text-sm text-slate-500 mb-6">
+              <strong>SFT (instruction / input / output)</strong>: paired turns;
+              user text is merged into <code className="text-xs bg-slate-100 px-1 rounded">instruction</code>{" "}
+              and <code className="text-xs bg-slate-100 px-1 rounded">input</code> is left empty.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Format
+              </label>
+              <select
+                value={exportFormat}
+                onChange={(e) =>
+                  setExportFormat(e.target.value as "messages" | "sft")
+                }
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              >
+                <option value="messages">Chat messages (JSONL)</option>
+                <option value="sft">SFT instruction / input / output (JSONL)</option>
+              </select>
+            </div>
 
             <div className="mb-6">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Select Language
+                Language filter
               </label>
               <select
                 value={exportLanguage}
