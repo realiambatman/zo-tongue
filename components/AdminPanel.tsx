@@ -17,17 +17,6 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 
 import { useNavigate } from "react-router-dom";
 
-/** Shorten prior assistant reply for unrolled SFT `input` (brief context, not full duplication). */
-function truncateForContext(text: string, maxChars: number): string {
-  const t = text.replace(/\s+/g, " ").trim();
-  if (maxChars <= 0 || t.length <= maxChars) return t;
-  const slice = t.slice(0, maxChars);
-  const lastSpace = slice.lastIndexOf(" ");
-  const cut =
-    lastSpace > Math.floor(maxChars * 0.5) ? slice.slice(0, lastSpace) : slice;
-  return `${cut.trimEnd()}…`;
-}
-
 export const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const onBack = () => navigate("/");
@@ -53,14 +42,6 @@ export const AdminPanel: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
     "messages"
   );
-  /** SFT only: "flat" = empty input every row; "unrolled" = prior assistant reply in input for 2nd+ turns */
-  const [exportSftMode, setExportSftMode] = useState<"flat" | "unrolled">(
-    "unrolled"
-  );
-  /** Unrolled only: max chars for prior reply in `input`; null = full prior text */
-  const [exportContextMaxChars, setExportContextMaxChars] = useState<
-    number | null
-  >(600);
 
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
@@ -112,7 +93,6 @@ export const AdminPanel: React.FC = () => {
       [];
 
     sessionsToExport.forEach((session) => {
-      let previousAssistantFull = "";
       const msgs = session.messages;
       for (let i = 0; i < msgs.length - 1; i++) {
         const currentMsg = msgs[i];
@@ -128,25 +108,11 @@ export const AdminPanel: React.FC = () => {
           const userText = (currentMsg.text || "").trim();
           if (!userText) continue;
 
-          const outputText = nextMsg.text ?? "";
-          let inputContext = "";
-          if (exportSftMode === "unrolled" && previousAssistantFull.trim()) {
-            inputContext =
-              exportContextMaxChars == null
-                ? previousAssistantFull.trim()
-                : truncateForContext(
-                    previousAssistantFull,
-                    exportContextMaxChars
-                  );
-          }
-
           sftData.push({
             instruction: userText,
-            input: inputContext,
-            output: outputText,
+            input: "",
+            output: nextMsg.text ?? "",
           });
-
-          previousAssistantFull = outputText;
         }
       }
     });
@@ -158,10 +124,7 @@ export const AdminPanel: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download =
-      exportSftMode === "unrolled"
-        ? `sft_unrolled_${langSlug}_${dateSlug}.jsonl`
-        : `sft_flat_${langSlug}_${dateSlug}.jsonl`;
+    a.download = `sft_data_${langSlug}_${dateSlug}.jsonl`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1013,18 +976,11 @@ export const AdminPanel: React.FC = () => {
               <code className="text-xs bg-slate-100 px-1 rounded">messages</code>{" "}
               (user / assistant). CHAT sessions only.
             </p>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-500 mb-6">
               <strong>SFT</strong>: one row per user→assistant pair;{" "}
               <code className="text-xs bg-slate-100 px-1 rounded">instruction</code> is the user
-              turn (no system prompt).
-            </p>
-            <p className="text-sm text-slate-500 mb-6">
-              <strong>Unrolled</strong>: first row has empty{" "}
-              <code className="text-xs bg-slate-100 px-1 rounded">input</code>; later rows use a{" "}
-              <strong>short excerpt</strong> of the previous assistant message in{" "}
-              <code className="text-xs bg-slate-100 px-1 rounded">input</code> (not the full text—
-              <code className="text-xs bg-slate-100 px-1 rounded">output</code> is always the new
-              reply). <strong>Flat</strong>: empty <code className="text-xs bg-slate-100 px-1 rounded">input</code> every row.
+              turn (no system prompt); <code className="text-xs bg-slate-100 px-1 rounded">input</code>{" "}
+              is left empty for now.
             </p>
 
             <div className="mb-4">
@@ -1042,54 +998,6 @@ export const AdminPanel: React.FC = () => {
                 <option value="sft">SFT instruction / input / output (JSONL)</option>
               </select>
             </div>
-
-            {exportFormat === "sft" && (
-              <div className="mb-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  SFT style
-                </label>
-                <select
-                  value={exportSftMode}
-                  onChange={(e) =>
-                    setExportSftMode(e.target.value as "flat" | "unrolled")
-                  }
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="unrolled">
-                    Unrolled (context in input for follow-ups)
-                  </option>
-                  <option value="flat">Flat (empty input every row)</option>
-                </select>
-              </div>
-            )}
-
-            {exportFormat === "sft" && exportSftMode === "unrolled" && (
-              <div className="mb-4">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                  Prior context length (input field)
-                </label>
-                <select
-                  value={
-                    exportContextMaxChars == null
-                      ? "full"
-                      : String(exportContextMaxChars)
-                  }
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportContextMaxChars(
-                      v === "full" ? null : parseInt(v, 10)
-                    );
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                >
-                  <option value="400">Brief (~400 chars)</option>
-                  <option value="600">~600 chars (default)</option>
-                  <option value="900">~900 chars</option>
-                  <option value="1200">~1200 chars</option>
-                  <option value="full">Full prior reply (can be very long)</option>
-                </select>
-              </div>
-            )}
 
             <div className="mb-6">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
