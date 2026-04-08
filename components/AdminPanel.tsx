@@ -43,21 +43,6 @@ export const AdminPanel: React.FC = () => {
     "messages"
   );
 
-  const buildInstructionPrefix = (session: ChatSession): string => {
-    const lang = session.language || "English";
-    switch (session.type) {
-      case SessionType.TRANSLATE:
-        return `Translate the following text to ${lang}.`;
-      case SessionType.STUDY:
-        return `Help the user study the following topic in ${lang}.`;
-      case SessionType.SOLVER:
-        return `Solve the following problem. Explain in ${lang}.`;
-      case SessionType.CHAT:
-      default:
-        return `You are a helpful AI assistant in ${lang}.`;
-    }
-  };
-
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -120,14 +105,11 @@ export const AdminPanel: React.FC = () => {
           (nextMsg.role === "model" || nextMsg.isAdminReply) &&
           !nextMsg.isError
         ) {
-          const prefix = buildInstructionPrefix(session);
-          const userText = currentMsg.text || "";
-          const instruction = userText.trim()
-            ? `${prefix}\n\n${userText}`.trim()
-            : prefix;
+          const userText = (currentMsg.text || "").trim();
+          if (!userText) continue;
 
           sftData.push({
-            instruction,
+            instruction: userText,
             input: "",
             output: nextMsg.text,
           });
@@ -996,8 +978,8 @@ export const AdminPanel: React.FC = () => {
             </p>
             <p className="text-sm text-slate-500 mb-6">
               <strong>SFT (instruction / input / output)</strong>: paired turns;
-              user text is merged into <code className="text-xs bg-slate-100 px-1 rounded">instruction</code>{" "}
-              and <code className="text-xs bg-slate-100 px-1 rounded">input</code> is left empty.
+              <code className="text-xs bg-slate-100 px-1 rounded">instruction</code> is the user
+              message only (no system prompt); <code className="text-xs bg-slate-100 px-1 rounded">input</code> is empty.
             </p>
 
             <div className="mb-4">
