@@ -42,6 +42,10 @@ export const AdminPanel: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
     "messages"
   );
+  /** SFT only: "flat" = empty input every row; "unrolled" = prior assistant reply in input for 2nd+ turns */
+  const [exportSftMode, setExportSftMode] = useState<"flat" | "unrolled">(
+    "unrolled"
+  );
 
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
@@ -93,6 +97,7 @@ export const AdminPanel: React.FC = () => {
       [];
 
     sessionsToExport.forEach((session) => {
+      let previousAssistantText = "";
       const msgs = session.messages;
       for (let i = 0; i < msgs.length - 1; i++) {
         const currentMsg = msgs[i];
@@ -108,11 +113,19 @@ export const AdminPanel: React.FC = () => {
           const userText = (currentMsg.text || "").trim();
           if (!userText) continue;
 
+          const outputText = nextMsg.text ?? "";
+          const inputContext =
+            exportSftMode === "unrolled" && previousAssistantText.trim()
+              ? previousAssistantText
+              : "";
+
           sftData.push({
             instruction: userText,
-            input: "",
-            output: nextMsg.text,
+            input: inputContext,
+            output: outputText,
           });
+
+          previousAssistantText = outputText;
         }
       }
     });
@@ -124,7 +137,10 @@ export const AdminPanel: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sft_data_${langSlug}_${dateSlug}.jsonl`;
+    a.download =
+      exportSftMode === "unrolled"
+        ? `sft_unrolled_${langSlug}_${dateSlug}.jsonl`
+        : `sft_flat_${langSlug}_${dateSlug}.jsonl`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -976,10 +992,17 @@ export const AdminPanel: React.FC = () => {
               <code className="text-xs bg-slate-100 px-1 rounded">messages</code>{" "}
               (user / assistant). CHAT sessions only.
             </p>
-            <p className="text-sm text-slate-500 mb-6">
-              <strong>SFT (instruction / input / output)</strong>: paired turns;
+            <p className="text-sm text-slate-500 mb-4">
+              <strong>SFT</strong>: one row per user→assistant pair;{" "}
               <code className="text-xs bg-slate-100 px-1 rounded">instruction</code> is the user
-              message only (no system prompt); <code className="text-xs bg-slate-100 px-1 rounded">input</code> is empty.
+              turn (no system prompt).
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              <strong>Unrolled</strong> (recommended for multi-turn): first row has empty{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">input</code>; later rows put the
+              previous assistant reply in <code className="text-xs bg-slate-100 px-1 rounded">input</code>{" "}
+              so follow-ups like “explain briefly” keep context. <strong>Flat</strong>:{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">input</code> is always empty.
             </p>
 
             <div className="mb-4">
@@ -997,6 +1020,26 @@ export const AdminPanel: React.FC = () => {
                 <option value="sft">SFT instruction / input / output (JSONL)</option>
               </select>
             </div>
+
+            {exportFormat === "sft" && (
+              <div className="mb-4">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  SFT style
+                </label>
+                <select
+                  value={exportSftMode}
+                  onChange={(e) =>
+                    setExportSftMode(e.target.value as "flat" | "unrolled")
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  <option value="unrolled">
+                    Unrolled (context in input for follow-ups)
+                  </option>
+                  <option value="flat">Flat (empty input every row)</option>
+                </select>
+              </div>
+            )}
 
             <div className="mb-6">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
