@@ -26,13 +26,13 @@ export const AdminPanel: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(
-    null
+    null,
   );
   const [activeTab, setActiveTab] = useState<"users" | "guests" | "active">(
-    "users"
+    "users",
   );
   const [selectedUserEmail, setSelectedUserEmail] = useState<string | null>(
-    null
+    null,
   );
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
@@ -40,14 +40,11 @@ export const AdminPanel: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportLanguage, setExportLanguage] = useState<string>("All");
   const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
-    "messages"
+    "messages",
   );
 
   const getWordCount = (text: string): number =>
-    text
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
+    text.trim().split(/\s+/).filter(Boolean).length;
 
   const isRefusalLine = (text: string): boolean => {
     const t = text.trim().toLowerCase();
@@ -134,7 +131,7 @@ export const AdminPanel: React.FC = () => {
 
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
-      (s) => exportLanguage === "All" || s.language === exportLanguage
+      (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
 
     const langSlug = exportLanguage.toLowerCase().replace(/\s+/g, "_");
@@ -144,16 +141,21 @@ export const AdminPanel: React.FC = () => {
       const lines: string[] = [];
       const addLanguageHeaderIfNeeded = (language: string) => {
         if (exportLanguage !== "All") return;
-        lines.push(JSON.stringify({ comment: `=== Language: ${language} ===` }));
+        lines.push(
+          JSON.stringify({ comment: `=== Language: ${language} ===` }),
+        );
       };
 
       const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
-        (a.language || "").localeCompare(b.language || "")
+        (a.language || "").localeCompare(b.language || ""),
       );
       let currentLanguageHeader = "";
 
       sessionsByLanguage.forEach((session) => {
-        if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
+        if (
+          exportLanguage === "All" &&
+          session.language !== currentLanguageHeader
+        ) {
           currentLanguageHeader = session.language;
           addLanguageHeaderIfNeeded(session.language);
         }
@@ -175,20 +177,17 @@ export const AdminPanel: React.FC = () => {
           }
 
           const userText = normalizeTranslationLabel(
-            (currentMsg.text || "").trim()
+            (currentMsg.text || "").trim(),
           );
           const assistantText = normalizeTranslationLabel(
-            (nextMsg.text || "").trim()
+            (nextMsg.text || "").trim(),
           );
 
           if (!userText || !assistantText) continue;
           if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText))
             continue;
           if (isRefusalLine(assistantText)) continue;
-          if (
-            session.type === SessionType.TRANSLATE &&
-            isContextlessTranslatePrompt(userText)
-          ) {
+          if (isContextlessTranslatePrompt(userText)) {
             continue;
           }
 
@@ -205,7 +204,7 @@ export const AdminPanel: React.FC = () => {
         }
 
         const assistantCount = messages.filter(
-          (m) => m.role === "assistant"
+          (m) => m.role === "assistant",
         ).length;
         if (messages.length > 0 && assistantCount >= 1) {
           lines.push(JSON.stringify({ messages }));
@@ -232,15 +231,18 @@ export const AdminPanel: React.FC = () => {
       [];
     const sftLines: string[] = [];
     const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
-      (a.language || "").localeCompare(b.language || "")
+      (a.language || "").localeCompare(b.language || ""),
     );
     let currentLanguageHeader = "";
 
     sessionsByLanguage.forEach((session) => {
-      if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
+      if (
+        exportLanguage === "All" &&
+        session.language !== currentLanguageHeader
+      ) {
         currentLanguageHeader = session.language;
         sftLines.push(
-          JSON.stringify({ comment: `=== Language: ${session.language} ===` })
+          JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
         );
       }
 
@@ -257,7 +259,7 @@ export const AdminPanel: React.FC = () => {
           !nextMsg.isError
         ) {
           const userText = normalizeTranslationLabel(
-            (currentMsg.text || "").trim()
+            (currentMsg.text || "").trim(),
           );
           if (!userText) continue;
           if (
@@ -266,17 +268,15 @@ export const AdminPanel: React.FC = () => {
           ) {
             continue;
           }
-          if (
-            session.type === SessionType.TRANSLATE &&
-            isContextlessTranslatePrompt(userText)
-          ) {
+          if (isContextlessTranslatePrompt(userText)) {
             continue;
           }
           const outputText = normalizeTranslationLabel(
-            (nextMsg.text || "").trim()
+            (nextMsg.text || "").trim(),
           );
           if (!outputText || isRefusalLine(outputText)) continue;
-          if (isErrorLikeLine(userText) || isErrorLikeLine(outputText)) continue;
+          if (isErrorLikeLine(userText) || isErrorLikeLine(outputText))
+            continue;
 
           sftData.push({
             instruction: userText,
@@ -311,7 +311,7 @@ export const AdminPanel: React.FC = () => {
   // Only check after auth has finished loading to prevent false "Access Denied" flash
   const isAdmin = authLoading
     ? null
-    : user?.email?.endsWith("@buildnbit.com") ?? false;
+    : (user?.email?.endsWith("@buildnbit.com") ?? false);
 
   // Force re-render every 5 seconds to update "active" status
   useEffect(() => {
@@ -326,19 +326,22 @@ export const AdminPanel: React.FC = () => {
   const userSessions = sessions.filter((s) => s.userEmail);
   const activeSessions = sessions
     .filter(
-      (s) => Date.now() - s.lastUpdated < 30000 // 30 seconds activity window
+      (s) => Date.now() - s.lastUpdated < 30000, // 30 seconds activity window
     )
     .sort((a, b) => b.lastUpdated - a.lastUpdated);
 
   // Group user sessions by email
-  const sessionsByEmail = userSessions.reduce((acc, session) => {
-    const email = session.userEmail!;
-    if (!acc[email]) {
-      acc[email] = [];
-    }
-    acc[email].push(session);
-    return acc;
-  }, {} as Record<string, ChatSession[]>);
+  const sessionsByEmail = userSessions.reduce(
+    (acc, session) => {
+      const email = session.userEmail!;
+      if (!acc[email]) {
+        acc[email] = [];
+      }
+      acc[email].push(session);
+      return acc;
+    },
+    {} as Record<string, ChatSession[]>,
+  );
 
   // Create unified user list
   const allDisplayUsers = users.map((user) => {
@@ -349,7 +352,7 @@ export const AdminPanel: React.FC = () => {
       sessions: userSessions.sort((a, b) => b.lastUpdated - a.lastUpdated),
       lastActive: Math.max(
         user.lastLogin,
-        ...(userSessions.map((s) => s.lastUpdated) || [0])
+        ...(userSessions.map((s) => s.lastUpdated) || [0]),
       ),
     };
   });
@@ -362,17 +365,17 @@ export const AdminPanel: React.FC = () => {
         email,
         displayName: null,
         sessions: sessionsByEmail[email].sort(
-          (a, b) => b.lastUpdated - a.lastUpdated
+          (a, b) => b.lastUpdated - a.lastUpdated,
         ),
         lastActive: Math.max(
-          ...sessionsByEmail[email].map((s) => s.lastUpdated)
+          ...sessionsByEmail[email].map((s) => s.lastUpdated),
         ),
       });
     }
   });
 
   const uniqueUsers = allDisplayUsers.sort(
-    (a, b) => b.lastActive - a.lastActive
+    (a, b) => b.lastActive - a.lastActive,
   );
 
   // Prevent body scroll on mount (mobile viewport fix)
@@ -498,7 +501,7 @@ export const AdminPanel: React.FC = () => {
   const handleDeleteSession = async (sessionId: string) => {
     if (
       !confirm(
-        "Are you sure you want to delete this entire chat session? This action cannot be undone."
+        "Are you sure you want to delete this entire chat session? This action cannot be undone.",
       )
     ) {
       return;
@@ -520,7 +523,7 @@ export const AdminPanel: React.FC = () => {
 
     if (
       !confirm(
-        "Are you sure you want to delete this message? This action cannot be undone."
+        "Are you sure you want to delete this message? This action cannot be undone.",
       )
     ) {
       return;
@@ -710,7 +713,7 @@ export const AdminPanel: React.FC = () => {
                 {isMaintenanceMode ? "ON" : "OFF"}
               </span>
             </div>
-            
+
             {/* Export Button */}
             <button
               onClick={() => setShowExportModal(true)}
@@ -958,7 +961,7 @@ export const AdminPanel: React.FC = () => {
                         onClick={() =>
                           toggleAiPause(
                             selectedSession.id,
-                            !selectedSession.isAiPaused
+                            !selectedSession.isAiPaused,
                           )
                         }
                         className={`px-3 lg:px-4 py-1.5 lg:py-2 rounded-full text-[9px] lg:text-[10px] font-bold uppercase tracking-wider lg:tracking-widest transition-all border ${
@@ -1025,8 +1028,8 @@ export const AdminPanel: React.FC = () => {
                               {isIncoming
                                 ? "User"
                                 : msg.isAdminReply
-                                ? "Admin"
-                                : "AI"}
+                                  ? "Admin"
+                                  : "AI"}
                             </span>
                             <button
                               onClick={() => handleDeleteMessage(msg.id)}
@@ -1055,8 +1058,8 @@ export const AdminPanel: React.FC = () => {
                               isIncoming
                                 ? "bg-white border border-slate-200 text-ink rounded-2xl lg:rounded-3xl rounded-bl-lg"
                                 : msg.isAdminReply
-                                ? "bg-indigo-600 text-white border border-indigo-500 rounded-2xl lg:rounded-3xl rounded-br-lg"
-                                : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-br-lg"
+                                  ? "bg-indigo-600 text-white border border-indigo-500 rounded-2xl lg:rounded-3xl rounded-br-lg"
+                                  : "bg-slate-100 text-ink border border-slate-200 rounded-2xl lg:rounded-3xl rounded-br-lg"
                             }`}
                           >
                             {msg.image && (
@@ -1145,17 +1148,24 @@ export const AdminPanel: React.FC = () => {
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold text-ink mb-4">Export training data</h3>
+            <h3 className="text-lg font-bold text-ink mb-4">
+              Export training data
+            </h3>
             <p className="text-sm text-slate-500 mb-4">
               <strong>Chat messages</strong>: one JSON object per line with{" "}
-              <code className="text-xs bg-slate-100 px-1 rounded">messages</code>{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">
+                messages
+              </code>{" "}
               (user / assistant). Includes chat, translate, study, and solver
               sessions.
             </p>
             <p className="text-sm text-slate-500 mb-6">
               <strong>SFT</strong>: one row per user→assistant pair;{" "}
-              <code className="text-xs bg-slate-100 px-1 rounded">instruction</code> is the user
-              turn (no system prompt); <code className="text-xs bg-slate-100 px-1 rounded">input</code>{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">
+                instruction
+              </code>{" "}
+              is the user turn (no system prompt);{" "}
+              <code className="text-xs bg-slate-100 px-1 rounded">input</code>{" "}
               is left empty for now.
             </p>
 
@@ -1171,7 +1181,9 @@ export const AdminPanel: React.FC = () => {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
                 <option value="messages">Chat messages (JSONL)</option>
-                <option value="sft">SFT instruction / input / output (JSONL)</option>
+                <option value="sft">
+                  SFT instruction / input / output (JSONL)
+                </option>
               </select>
             </div>
 
