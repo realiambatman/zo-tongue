@@ -83,6 +83,40 @@ export const AdminPanel: React.FC = () => {
     return errorPatterns.some((pattern) => pattern.test(t));
   };
 
+  const normalizeTranslationLabel = (text: string): string => {
+    // Convert prefixes like: [English -> Paite] some text
+    const m = text.trim().match(/^\[([^\]]+?)\s*->\s*([^\]]+?)\]\s*(.*)$/);
+    if (!m) return text;
+    const from = m[1].trim();
+    const to = m[2].trim();
+    const rest = m[3].trim();
+    return rest
+      ? `Translate from ${from} to ${to}: ${rest}`
+      : `Translate from ${from} to ${to}`;
+  };
+
+  const inferTurnLanguage = (
+    userText: string,
+    assistantText: string,
+    fallbackLanguage: string
+  ): string => {
+    const combined = `${userText} ${assistantText}`;
+    const patterns = [
+      /translate\s+from\s+[a-z]+(?:\s+[a-z]+)?\s+to\s+([a-z]+(?:\s+[a-z]+)?)/i,
+      /translate\s+to\s+([a-z]+(?:\s+[a-z]+)?)/i,
+      /translate\s+in\s+([a-z]+(?:\s+[a-z]+)?)/i,
+      /in\s+([a-z]+(?:\s+[a-z]+)?)\s*:/i,
+    ];
+    for (const pattern of patterns) {
+      const match = combined.match(pattern);
+      if (match?.[1]) {
+        const lang = match[1].trim().replace(/\s+/g, " ");
+        return lang.charAt(0).toUpperCase() + lang.slice(1).toLowerCase();
+      }
+    }
+    return fallbackLanguage || "Unknown";
+  };
+
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -104,12 +138,10 @@ export const AdminPanel: React.FC = () => {
       let currentLanguageHeader = "";
 
       sessionsByLanguage.forEach((session) => {
-        if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
-          currentLanguageHeader = session.language;
-          addLanguageHeaderIfNeeded(session.language);
-        }
-
         const msgs = session.messages;
+        let segmentMessages: { role: "user" | "assistant"; content: string }[] =
+          [];
+        let segmentLanguage = session.language || "Unknown";
         for (let i = 0; i < msgs.length - 1; i++) {
           const currentMsg = msgs[i];
           const nextMsg = msgs[i + 1];
@@ -124,8 +156,12 @@ export const AdminPanel: React.FC = () => {
             continue;
           }
 
-          const userText = (currentMsg.text || "").trim();
-          const assistantText = (nextMsg.text || "").trim();
+          const userText = normalizeTranslationLabel(
+            (currentMsg.text || "").trim()
+          );
+          const assistantText = normalizeTranslationLabel(
+            (nextMsg.text || "").trim()
+          );
           if (!userText || !assistantText) continue;
           if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText)) continue;
           if (isRefusalLine(assistantText)) continue;
@@ -138,14 +174,34 @@ export const AdminPanel: React.FC = () => {
             continue;
           }
 
-          lines.push(
-            JSON.stringify({
-              messages: [
-                { role: "user", content: userText },
-                { role: "assistant", content: assistantText },
-              ],
-            })
+          const turnLanguage = inferTurnLanguage(
+            userText,
+            assistantText,
+            session.language || "Unknown"
           );
+
+          if (segmentMessages.length > 0 && turnLanguage !== segmentLanguage) {
+            if (exportLanguage === "All" && segmentLanguage !== currentLanguageHeader) {
+              currentLanguageHeader = segmentLanguage;
+              addLanguageHeaderIfNeeded(segmentLanguage);
+            }
+            lines.push(JSON.stringify({ messages: segmentMessages }));
+            segmentMessages = [];
+            segmentLanguage = turnLanguage;
+          } else if (segmentMessages.length === 0) {
+            segmentLanguage = turnLanguage;
+          }
+
+          segmentMessages.push({ role: "user", content: userText });
+          segmentMessages.push({ role: "assistant", content: assistantText });
+        }
+
+        if (segmentMessages.length > 0) {
+          if (exportLanguage === "All" && segmentLanguage !== currentLanguageHeader) {
+            currentLanguageHeader = segmentLanguage;
+            addLanguageHeaderIfNeeded(segmentLanguage);
+          }
+          lines.push(JSON.stringify({ messages: segmentMessages }));
         }
       });
 
@@ -193,7 +249,9 @@ export const AdminPanel: React.FC = () => {
           (nextMsg.role === "model" || nextMsg.isAdminReply) &&
           !nextMsg.isError
         ) {
-          const userText = (currentMsg.text || "").trim();
+          const userText = normalizeTranslationLabel(
+            (currentMsg.text || "").trim()
+          );
           if (!userText) continue;
           if (
             session.type === SessionType.SOLVER &&
@@ -201,7 +259,9 @@ export const AdminPanel: React.FC = () => {
           ) {
             continue;
           }
-          const outputText = (nextMsg.text || "").trim();
+          const outputText = normalizeTranslationLabel(
+            (nextMsg.text || "").trim()
+          );
           if (!outputText || isRefusalLine(outputText)) continue;
           if (isErrorLikeLine(userText) || isErrorLikeLine(outputText)) continue;
 
