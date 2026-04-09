@@ -129,27 +129,49 @@ export const AdminPanel: React.FC = () => {
         }
 
         const messages: { role: "user" | "assistant"; content: string }[] = [];
-        for (const msg of session.messages) {
-          if (msg.isError || msg.isSystem) continue;
-          const text = normalizeTranslationLabel((msg.text || "").trim());
-          if (!text || isErrorLikeLine(text)) continue;
+        const msgs = session.messages;
+        for (let i = 0; i < msgs.length - 1; i++) {
+          const currentMsg = msgs[i];
+          const nextMsg = msgs[i + 1];
 
-          if (msg.role === "user") {
-            // Solver exports should be text-only and skip generic short prompts.
-            if (
-              session.type === SessionType.SOLVER &&
-              getWordCount(text) < 10
-            ) {
-              continue;
-            }
-            messages.push({ role: "user", content: text });
-          } else if (msg.role === "model" || msg.isAdminReply) {
-            if (isRefusalLine(text)) continue;
-            messages.push({ role: "assistant", content: text });
+          if (
+            currentMsg.role !== "user" ||
+            currentMsg.isSystem ||
+            currentMsg.isError ||
+            (nextMsg.role !== "model" && !nextMsg.isAdminReply) ||
+            nextMsg.isError
+          ) {
+            continue;
           }
+
+          const userText = normalizeTranslationLabel(
+            (currentMsg.text || "").trim()
+          );
+          const assistantText = normalizeTranslationLabel(
+            (nextMsg.text || "").trim()
+          );
+
+          if (!userText || !assistantText) continue;
+          if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText))
+            continue;
+          if (isRefusalLine(assistantText)) continue;
+
+          // Solver: text-only + skip generic short user prompts.
+          if (
+            session.type === SessionType.SOLVER &&
+            getWordCount(userText) < 10
+          ) {
+            continue;
+          }
+
+          messages.push({ role: "user", content: userText });
+          messages.push({ role: "assistant", content: assistantText });
         }
 
-        if (messages.length > 0) {
+        const assistantCount = messages.filter(
+          (m) => m.role === "assistant"
+        ).length;
+        if (messages.length > 0 && assistantCount >= 1) {
           lines.push(JSON.stringify({ messages }));
         }
       });
