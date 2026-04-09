@@ -102,28 +102,6 @@ export const AdminPanel: React.FC = () => {
       : `Translate from ${from} to ${to}`;
   };
 
-  const inferTurnLanguage = (
-    userText: string,
-    assistantText: string,
-    fallbackLanguage: string
-  ): string => {
-    const combined = `${userText} ${assistantText}`;
-    const patterns = [
-      /translate\s+from\s+[a-z]+(?:\s+[a-z]+)?\s+to\s+([a-z]+(?:\s+[a-z]+)?)/i,
-      /translate\s+to\s+([a-z]+(?:\s+[a-z]+)?)/i,
-      /translate\s+in\s+([a-z]+(?:\s+[a-z]+)?)/i,
-      /in\s+([a-z]+(?:\s+[a-z]+)?)\s*:/i,
-    ];
-    for (const pattern of patterns) {
-      const match = combined.match(pattern);
-      if (match?.[1]) {
-        const lang = match[1].trim().replace(/\s+/g, " ");
-        return lang.charAt(0).toUpperCase() + lang.slice(1).toLowerCase();
-      }
-    }
-    return fallbackLanguage || "Unknown";
-  };
-
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -145,70 +123,34 @@ export const AdminPanel: React.FC = () => {
       let currentLanguageHeader = "";
 
       sessionsByLanguage.forEach((session) => {
-        const msgs = session.messages;
-        let segmentMessages: { role: "user" | "assistant"; content: string }[] =
-          [];
-        let segmentLanguage = session.language || "Unknown";
-        for (let i = 0; i < msgs.length - 1; i++) {
-          const currentMsg = msgs[i];
-          const nextMsg = msgs[i + 1];
-
-          if (
-            currentMsg.role !== "user" ||
-            currentMsg.isSystem ||
-            currentMsg.isError ||
-            (nextMsg.role !== "model" && !nextMsg.isAdminReply) ||
-            nextMsg.isError
-          ) {
-            continue;
-          }
-
-          const userText = normalizeTranslationLabel(
-            (currentMsg.text || "").trim()
-          );
-          const assistantText = normalizeTranslationLabel(
-            (nextMsg.text || "").trim()
-          );
-          if (!userText || !assistantText) continue;
-          if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText)) continue;
-          if (isRefusalLine(assistantText)) continue;
-
-          // Solver exports should be text-only and skip generic short prompts.
-          if (
-            session.type === SessionType.SOLVER &&
-            getWordCount(userText) < 10
-          ) {
-            continue;
-          }
-
-          const turnLanguage = inferTurnLanguage(
-            userText,
-            assistantText,
-            session.language || "Unknown"
-          );
-
-          if (segmentMessages.length > 0 && turnLanguage !== segmentLanguage) {
-            if (exportLanguage === "All" && segmentLanguage !== currentLanguageHeader) {
-              currentLanguageHeader = segmentLanguage;
-              addLanguageHeaderIfNeeded(segmentLanguage);
-            }
-            lines.push(JSON.stringify({ messages: segmentMessages }));
-            segmentMessages = [];
-            segmentLanguage = turnLanguage;
-          } else if (segmentMessages.length === 0) {
-            segmentLanguage = turnLanguage;
-          }
-
-          segmentMessages.push({ role: "user", content: userText });
-          segmentMessages.push({ role: "assistant", content: assistantText });
+        if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
+          currentLanguageHeader = session.language;
+          addLanguageHeaderIfNeeded(session.language);
         }
 
-        if (segmentMessages.length > 0) {
-          if (exportLanguage === "All" && segmentLanguage !== currentLanguageHeader) {
-            currentLanguageHeader = segmentLanguage;
-            addLanguageHeaderIfNeeded(segmentLanguage);
+        const messages: { role: "user" | "assistant"; content: string }[] = [];
+        for (const msg of session.messages) {
+          if (msg.isError || msg.isSystem) continue;
+          const text = normalizeTranslationLabel((msg.text || "").trim());
+          if (!text || isErrorLikeLine(text)) continue;
+
+          if (msg.role === "user") {
+            // Solver exports should be text-only and skip generic short prompts.
+            if (
+              session.type === SessionType.SOLVER &&
+              getWordCount(text) < 10
+            ) {
+              continue;
+            }
+            messages.push({ role: "user", content: text });
+          } else if (msg.role === "model" || msg.isAdminReply) {
+            if (isRefusalLine(text)) continue;
+            messages.push({ role: "assistant", content: text });
           }
-          lines.push(JSON.stringify({ messages: segmentMessages }));
+        }
+
+        if (messages.length > 0) {
+          lines.push(JSON.stringify({ messages }));
         }
       });
 
