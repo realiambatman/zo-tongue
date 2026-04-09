@@ -91,12 +91,11 @@ export const AdminPanel: React.FC = () => {
       const rest = generic[2].trim();
       return rest ? `${label}: ${rest}` : label;
     }
-    const from = m[1].trim();
     const to = m[2].trim();
     const rest = m[3].trim();
     return rest
-      ? `Translate from ${from} to ${to}: ${rest}`
-      : `Translate from ${from} to ${to}`;
+      ? `Translate to ${to}: ${rest}`
+      : `Translate to ${to}`;
   };
 
   const isContextlessTranslatePrompt = (text: string): boolean => {
