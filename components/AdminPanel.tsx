@@ -43,6 +43,30 @@ export const AdminPanel: React.FC = () => {
     "messages"
   );
 
+  const getWordCount = (text: string): number =>
+    text
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+
+  const isRefusalLine = (text: string): boolean => {
+    const t = text.trim().toLowerCase();
+    if (!t) return false;
+
+    // Common refusal patterns when user asks in wrong language.
+    const refusalPatterns = [
+      /i can(?:not|'t)?\s+(?:answer|respond|help).*language/,
+      /please\s+(?:ask|write|speak).*(?:in|using).*(?:language|english|paite|thadou|hmar|vaiphei|mizo|zou|kom|gangte)/,
+      /only\s+(?:support|respond|answer).*(?:language|english|paite|thadou|hmar|vaiphei|mizo|zou|kom|gangte)/,
+      /selected language/,
+      /wrong language/,
+      /language mismatch/,
+      /cannot process.*language/,
+    ];
+
+    return refusalPatterns.some((pattern) => pattern.test(t));
+  };
+
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -52,20 +76,43 @@ export const AdminPanel: React.FC = () => {
     const dateSlug = new Date().toISOString().slice(0, 10);
 
     if (exportFormat === "messages") {
-      const chatSessions = sessionsToExport.filter(
-        (s) => !s.type || s.type === SessionType.CHAT
-      );
       const lines: string[] = [];
-      chatSessions.forEach((session) => {
+      const addLanguageHeaderIfNeeded = (language: string) => {
+        if (exportLanguage !== "All") return;
+        lines.push(JSON.stringify({ comment: `=== Language: ${language} ===` }));
+      };
+
+      const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
+        (a.language || "").localeCompare(b.language || "")
+      );
+      let currentLanguageHeader = "";
+
+      sessionsByLanguage.forEach((session) => {
+        if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
+          currentLanguageHeader = session.language;
+          addLanguageHeaderIfNeeded(session.language);
+        }
+
         const messages: { role: "user" | "assistant"; content: string }[] = [];
         for (const msg of session.messages) {
           if (msg.isError || msg.isSystem) continue;
           const text = (msg.text || "").trim();
-          if (!text && !msg.image) continue;
+          if (!text) continue;
+
+          // Solver exports should be text-only and skip generic short prompts.
+          if (
+            session.type === SessionType.SOLVER &&
+            msg.role === "user" &&
+            getWordCount(text) < 10
+          ) {
+            continue;
+          }
+
           const content = msg.text || "";
           if (msg.role === "user") {
             messages.push({ role: "user", content });
           } else if (msg.role === "model" || msg.isAdminReply) {
+            if (isRefusalLine(content)) continue;
             messages.push({ role: "assistant", content });
           }
         }
@@ -91,8 +138,20 @@ export const AdminPanel: React.FC = () => {
 
     const sftData: { instruction: string; input: string; output: string }[] =
       [];
+    const sftLines: string[] = [];
+    const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
+      (a.language || "").localeCompare(b.language || "")
+    );
+    let currentLanguageHeader = "";
 
-    sessionsToExport.forEach((session) => {
+    sessionsByLanguage.forEach((session) => {
+      if (exportLanguage === "All" && session.language !== currentLanguageHeader) {
+        currentLanguageHeader = session.language;
+        sftLines.push(
+          JSON.stringify({ comment: `=== Language: ${session.language} ===` })
+        );
+      }
+
       const msgs = session.messages;
       for (let i = 0; i < msgs.length - 1; i++) {
         const currentMsg = msgs[i];
@@ -107,17 +166,30 @@ export const AdminPanel: React.FC = () => {
         ) {
           const userText = (currentMsg.text || "").trim();
           if (!userText) continue;
+          if (
+            session.type === SessionType.SOLVER &&
+            getWordCount(userText) < 10
+          ) {
+            continue;
+          }
+          const outputText = (nextMsg.text || "").trim();
+          if (!outputText || isRefusalLine(outputText)) continue;
 
           sftData.push({
             instruction: userText,
             input: "",
-            output: nextMsg.text ?? "",
+            output: outputText,
           });
         }
       }
+
+      if (sftData.length > 0) {
+        sftLines.push(...sftData.map((item) => JSON.stringify(item)));
+        sftData.length = 0;
+      }
     });
 
-    const jsonlContent = sftData.map((item) => JSON.stringify(item)).join("\n");
+    const jsonlContent = sftLines.join("\n");
     const blob = new Blob([jsonlContent], {
       type: "application/jsonlines",
     });
@@ -974,7 +1046,8 @@ export const AdminPanel: React.FC = () => {
             <p className="text-sm text-slate-500 mb-4">
               <strong>Chat messages</strong>: one JSON object per line with{" "}
               <code className="text-xs bg-slate-100 px-1 rounded">messages</code>{" "}
-              (user / assistant). CHAT sessions only.
+              (user / assistant). Includes chat, translate, study, and solver
+              sessions.
             </p>
             <p className="text-sm text-slate-500 mb-6">
               <strong>SFT</strong>: one row per user→assistant pair;{" "}
