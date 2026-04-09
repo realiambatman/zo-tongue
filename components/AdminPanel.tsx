@@ -102,6 +102,36 @@ export const AdminPanel: React.FC = () => {
       : `Translate from ${from} to ${to}`;
   };
 
+  const isContextlessTranslatePrompt = (text: string): boolean => {
+    const t = text.trim().toLowerCase();
+    if (!t) return true;
+
+    // Direct command with only target language and no source payload.
+    const bareTranslateCommands = [
+      /^translate\s+(?:to|in|into)\s+[a-z]+(?:\s+[a-z]+)?[.!?]*$/,
+      /^translate\s+this\s+(?:to|in|into)\s+[a-z]+(?:\s+[a-z]+)?[.!?]*$/,
+      /^can you translate(?:\s+this)?\s+(?:to|in|into)\s+[a-z]+(?:\s+[a-z]+)?[.!?]*$/,
+    ];
+    if (bareTranslateCommands.some((pattern) => pattern.test(t))) {
+      return true;
+    }
+
+    // Has translate intent but no obvious source content marker.
+    const hasTranslateIntent =
+      /translate/.test(t) ||
+      /convert/.test(t) ||
+      /^in\s+[a-z]+(?:\s+[a-z]+)?[.!?]*$/.test(t);
+    if (!hasTranslateIntent) return false;
+
+    const hasPayloadMarker =
+      /:/.test(t) ||
+      /["'“”‘’]/.test(t) ||
+      /\b(where|what|how|who|when|why)\b/.test(t) ||
+      /\bjustice\b|\blove\b|\bhospital\b|\bsentence\b/.test(t);
+
+    return !hasPayloadMarker && getWordCount(t) <= 6;
+  };
+
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -155,6 +185,12 @@ export const AdminPanel: React.FC = () => {
           if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText))
             continue;
           if (isRefusalLine(assistantText)) continue;
+          if (
+            session.type === SessionType.TRANSLATE &&
+            isContextlessTranslatePrompt(userText)
+          ) {
+            continue;
+          }
 
           // Solver: text-only + skip generic short user prompts.
           if (
@@ -227,6 +263,12 @@ export const AdminPanel: React.FC = () => {
           if (
             session.type === SessionType.SOLVER &&
             getWordCount(userText) < 30
+          ) {
+            continue;
+          }
+          if (
+            session.type === SessionType.TRANSLATE &&
+            isContextlessTranslatePrompt(userText)
           ) {
             continue;
           }
