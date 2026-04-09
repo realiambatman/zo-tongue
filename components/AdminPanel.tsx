@@ -159,7 +159,7 @@ export const AdminPanel: React.FC = () => {
           // Solver: text-only + skip generic short user prompts.
           if (
             session.type === SessionType.SOLVER &&
-            getWordCount(userText) < 10
+            getWordCount(userText) < 30
           ) {
             continue;
           }
@@ -226,7 +226,7 @@ export const AdminPanel: React.FC = () => {
           if (!userText) continue;
           if (
             session.type === SessionType.SOLVER &&
-            getWordCount(userText) < 10
+            getWordCount(userText) < 30
           ) {
             continue;
           }
