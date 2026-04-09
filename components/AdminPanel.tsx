@@ -67,6 +67,22 @@ export const AdminPanel: React.FC = () => {
     return refusalPatterns.some((pattern) => pattern.test(t));
   };
 
+  const isErrorLikeLine = (text: string): boolean => {
+    const t = text.trim().toLowerCase();
+    if (!t) return false;
+    const errorPatterns = [
+      /encountered an error/,
+      /an error occurred/,
+      /^error[:\s]/,
+      /something went wrong/,
+      /failed to (?:generate|respond|process|fetch)/,
+      /please try again/,
+      /network error/,
+      /timed out/,
+    ];
+    return errorPatterns.some((pattern) => pattern.test(t));
+  };
+
   const downloadSFTData = () => {
     const sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage
@@ -93,31 +109,44 @@ export const AdminPanel: React.FC = () => {
           addLanguageHeaderIfNeeded(session.language);
         }
 
-        const messages: { role: "user" | "assistant"; content: string }[] = [];
-        for (const msg of session.messages) {
-          if (msg.isError || msg.isSystem) continue;
-          const text = (msg.text || "").trim();
-          if (!text) continue;
+        const msgs = session.messages;
+        for (let i = 0; i < msgs.length - 1; i++) {
+          const currentMsg = msgs[i];
+          const nextMsg = msgs[i + 1];
 
-          // Solver exports should be text-only and skip generic short prompts.
           if (
-            session.type === SessionType.SOLVER &&
-            msg.role === "user" &&
-            getWordCount(text) < 10
+            currentMsg.role !== "user" ||
+            currentMsg.isSystem ||
+            currentMsg.isError ||
+            (nextMsg.role !== "model" && !nextMsg.isAdminReply) ||
+            nextMsg.isError
           ) {
             continue;
           }
 
-          const content = msg.text || "";
-          if (msg.role === "user") {
-            messages.push({ role: "user", content });
-          } else if (msg.role === "model" || msg.isAdminReply) {
-            if (isRefusalLine(content)) continue;
-            messages.push({ role: "assistant", content });
+          const userText = (currentMsg.text || "").trim();
+          const assistantText = (nextMsg.text || "").trim();
+          if (!userText || !assistantText) continue;
+          if (isErrorLikeLine(userText) || isErrorLikeLine(assistantText)) continue;
+          if (isRefusalLine(assistantText)) continue;
+
+          // Solver exports should be text-only and skip generic short prompts.
+          if (
+            session.type === SessionType.SOLVER &&
+            getWordCount(userText) < 10
+          ) {
+            continue;
           }
+
+          lines.push(
+            JSON.stringify({
+              messages: [
+                { role: "user", content: userText },
+                { role: "assistant", content: assistantText },
+              ],
+            })
+          );
         }
-        if (messages.length === 0) return;
-        lines.push(JSON.stringify({ messages }));
       });
 
       const jsonlContent = lines.join("\n");
@@ -174,6 +203,7 @@ export const AdminPanel: React.FC = () => {
           }
           const outputText = (nextMsg.text || "").trim();
           if (!outputText || isRefusalLine(outputText)) continue;
+          if (isErrorLikeLine(userText) || isErrorLikeLine(outputText)) continue;
 
           sftData.push({
             instruction: userText,
