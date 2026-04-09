@@ -86,7 +86,14 @@ export const AdminPanel: React.FC = () => {
   const normalizeTranslationLabel = (text: string): string => {
     // Convert prefixes like: [English -> Paite] some text
     const m = text.trim().match(/^\[([^\]]+?)\s*->\s*([^\]]+?)\]\s*(.*)$/);
-    if (!m) return text;
+    if (!m) {
+      // Convert generic bracketed prefixes like: [Solve in Paite] question
+      const generic = text.trim().match(/^\[([^\]]+)\]\s*(.*)$/);
+      if (!generic) return text;
+      const label = generic[1].trim();
+      const rest = generic[2].trim();
+      return rest ? `${label}: ${rest}` : label;
+    }
     const from = m[1].trim();
     const to = m[2].trim();
     const rest = m[3].trim();
