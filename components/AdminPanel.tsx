@@ -96,6 +96,8 @@ export const AdminPanel: React.FC = () => {
   const [exportDatePreset, setExportDatePreset] =
     useState<ExportDatePreset>("all");
   const [lastExportIso, setLastExportIso] = useState<string | null>(null);
+  /** When set, "since last" mode uses this ISO (e.g. from a history row) instead of latest export. */
+  const [exportCutoffIso, setExportCutoffIso] = useState<string | null>(null);
   const [exportHistoryPreview, setExportHistoryPreview] = useState<
     AdminExportHistoryEntry[]
   >([]);
@@ -200,15 +202,15 @@ export const AdminPanel: React.FC = () => {
   }, [showExportModal, user?.uid]);
 
   const applyDateFilter = (list: ChatSession[]): ChatSession[] => {
-    const lastIso = lastExportIso;
+    const sinceIso = exportCutoffIso ?? lastExportIso;
     if (exportMode === "sinceLastExact") {
-      if (!lastIso) {
+      if (!sinceIso) {
         alert(
           "No previous export on your account yet. Run an export once, or pick a calendar range.",
         );
         return [];
       }
-      const t0 = new Date(lastIso).getTime();
+      const t0 = new Date(sinceIso).getTime();
       let out = list.filter((s) => s.lastUpdated >= t0);
       if (exportDateTo.trim()) {
         const toMs = endOfLocalDayYmd(exportDateTo.trim());
@@ -260,24 +262,30 @@ export const AdminPanel: React.FC = () => {
     }
 
     const finishExportRecord = async () => {
+      const entry: Omit<AdminExportHistoryEntry, "at"> = {
+        sessionCount: sessionsToExport.length,
+        lang: exportLanguage,
+        format: exportFormat,
+        mode: exportMode,
+        basis:
+          exportMode === "sinceLastExact" ? "lastUpdated" : exportDateBasis,
+        fromDate: exportDateFrom || undefined,
+        toDate: exportDateTo || undefined,
+      };
       try {
-        await appendAdminExportHistory(uid, {
-          sessionCount: sessionsToExport.length,
-          lang: exportLanguage,
-          format: exportFormat,
-          mode: exportMode,
-          basis:
-            exportMode === "sinceLastExact" ? "lastUpdated" : exportDateBasis,
-          fromDate: exportDateFrom || undefined,
-          toDate: exportDateTo || undefined,
-        });
+        await appendAdminExportHistory(uid, entry);
         const p = await fetchAdminExportProfile(uid);
         setLastExportIso(p.lastExportAt);
         setExportHistoryPreview(p.history.slice(0, 5));
       } catch (e) {
         console.error(e);
+        const code =
+          e && typeof e === "object" && "code" in e
+            ? String((e as { code: string }).code)
+            : "";
+        const detail = e instanceof Error ? e.message : String(e);
         alert(
-          "Download succeeded, but saving export history to your account failed.",
+          `Download finished, but saving export history failed: ${detail}${code ? ` [${code}]` : ""}. Deploy Firestore rules (adminExportProfiles) or check the browser console.`,
         );
       }
     };
@@ -1350,6 +1358,7 @@ export const AdminPanel: React.FC = () => {
                       return;
                     }
                     setExportDatePreset(v);
+                    setExportCutoffIso(null);
                     const today = formatLocalYmd(new Date());
                     switch (v) {
                       case "all":
@@ -1500,13 +1509,36 @@ export const AdminPanel: React.FC = () => {
 
               {exportMode === "sinceLastExact" && (
                 <>
+                  {exportCutoffIso && (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      Cutoff from history:{" "}
+                      <span className="font-mono">
+                        {new Date(exportCutoffIso).toLocaleString()}
+                      </span>
+                      . Sessions with{" "}
+                      <code className="text-[10px] bg-white px-1 rounded">
+                        lastUpdated
+                      </code>{" "}
+                      at or after this time are included.{" "}
+                      <button
+                        type="button"
+                        className="underline font-semibold"
+                        onClick={() => setExportCutoffIso(null)}
+                      >
+                        Use latest export instead
+                      </button>
+                    </p>
+                  )}
                   <p className="text-xs text-slate-600 leading-relaxed">
                     Includes sessions with{" "}
                     <code className="bg-white px-1 rounded border border-slate-200">
                       lastUpdated
                     </code>{" "}
-                    at or after your last successful export (saved on your
-                    account). Optional <strong>To</strong> date caps the range.
+                    at or after{" "}
+                    {exportCutoffIso
+                      ? "the cutoff above"
+                      : "your last successful export (saved on your account)"}
+                    . Optional <strong>To</strong> date caps the range.
                   </p>
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
@@ -1532,19 +1564,43 @@ export const AdminPanel: React.FC = () => {
                 </p>
               )}
               {exportHistoryPreview.length > 0 && (
-                <details className="text-xs text-slate-600">
+                <details className="text-xs text-slate-600" open>
                   <summary className="cursor-pointer font-semibold text-slate-700">
                     Recent export history ({exportHistoryPreview.length})
                   </summary>
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Click a row to export only sessions with activity after that
+                    export time (same as incremental &quot;since&quot; filter).
+                  </p>
                   <ul className="mt-2 space-y-1 pl-2 border-l border-slate-200">
                     {exportHistoryPreview.map((h, idx) => (
-                      <li key={idx} className="font-mono text-[10px] leading-relaxed">
-                        {new Date(h.at).toLocaleString()} · {h.format} ·{" "}
-                        {h.lang} · {h.sessionCount} sessions ·{" "}
-                        {h.mode === "sinceLastExact"
-                          ? "since last"
-                          : `${h.fromDate || "—"}→${h.toDate || "—"}`}{" "}
-                        · {h.basis}
+                      <li key={`${h.at}-${idx}`}>
+                        <button
+                          type="button"
+                          className="w-full text-left font-mono text-[10px] leading-relaxed rounded-lg px-2 py-1.5 hover:bg-indigo-50 hover:text-indigo-900 border border-transparent hover:border-indigo-200 transition-colors"
+                          onClick={() => {
+                            const when = new Date(h.at).toLocaleString();
+                            if (
+                              !window.confirm(
+                                `Export all matching messages from sessions with last activity (lastUpdated) after this export?\n\n${when}\n\nUses format & language filters below. You can cancel and change them first.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            setExportDatePreset("since_last");
+                            setExportMode("sinceLastExact");
+                            setExportCutoffIso(h.at);
+                            setExportDateFrom("");
+                            setExportDateTo("");
+                          }}
+                        >
+                          {new Date(h.at).toLocaleString()} · {h.format} ·{" "}
+                          {h.lang} · {h.sessionCount} sessions ·{" "}
+                          {h.mode === "sinceLastExact"
+                            ? "since last"
+                            : `${h.fromDate || "—"}→${h.toDate || "—"}`}{" "}
+                          · {h.basis}
+                        </button>
                       </li>
                     ))}
                   </ul>
