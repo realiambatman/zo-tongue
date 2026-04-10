@@ -57,6 +57,11 @@ service cloud.firestore {
       allow read, update: if true;
     }
 
+    // Admin export history / last-export cursor (per admin account)
+    match /adminExportProfiles/{uid} {
+      allow read, write: if isAdmin() && isOwner(uid);
+    }
+
     // Default deny for other collections
     match /{document=**} {
       allow read, write: if false;

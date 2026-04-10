@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:firestore-rules": "grep -q 'match /adminExportProfiles/' firestore.rules && grep -q 'isAdmin() && isOwner(uid)' firestore.rules || (echo 'firestore.rules must define adminExportProfiles with isAdmin && isOwner' && exit 1)"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",

@@ -11,25 +11,23 @@ import {
   setMaintenanceMode,
   ChatSession,
   UserProfile,
+  fetchAdminExportProfile,
+  appendAdminExportHistory,
+  type AdminExportHistoryEntry,
 } from "../services/dbService";
 import { ChatMessage, SessionType, SupportedLanguage } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 import { useNavigate } from "react-router-dom";
 
-const LS_EXPORT_LAST = "zotongue_admin_last_export_iso";
-const LS_EXPORT_HISTORY = "zotongue_admin_export_history";
-
-type ExportHistoryEntry = {
-  at: string;
-  fromDate?: string;
-  toDate?: string;
-  lang: string;
-  format: string;
-  mode: "range" | "sinceLastExact";
-  basis: "lastUpdated" | "startTime";
-  sessionCount: number;
-};
+type ExportDatePreset =
+  | "all"
+  | "today"
+  | "last7"
+  | "last30"
+  | "since_last"
+  | "day_after_last_to_today"
+  | "custom";
 
 function startOfLocalDayYmd(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number);
@@ -54,37 +52,10 @@ function nextLocalDayYmdFromIso(iso: string): string {
   return formatLocalYmd(d);
 }
 
-function loadLastExportIso(): string | null {
-  try {
-    return localStorage.getItem(LS_EXPORT_LAST);
-  } catch {
-    return null;
-  }
-}
-
-function loadExportHistory(): ExportHistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(LS_EXPORT_HISTORY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as ExportHistoryEntry[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function recordExport(entry: Omit<ExportHistoryEntry, "at">) {
-  try {
-    const row: ExportHistoryEntry = { at: new Date().toISOString(), ...entry };
-    localStorage.setItem(LS_EXPORT_LAST, row.at);
-    const prev = loadExportHistory();
-    localStorage.setItem(
-      LS_EXPORT_HISTORY,
-      JSON.stringify([row, ...prev].slice(0, 30)),
-    );
-  } catch {
-    /* ignore quota */
-  }
+function daysAgoYmd(daysAgo: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - daysAgo);
+  return formatLocalYmd(d);
 }
 
 export const AdminPanel: React.FC = () => {
@@ -122,9 +93,11 @@ export const AdminPanel: React.FC = () => {
   const [exportMode, setExportMode] = useState<"range" | "sinceLastExact">(
     "range",
   );
+  const [exportDatePreset, setExportDatePreset] =
+    useState<ExportDatePreset>("all");
   const [lastExportIso, setLastExportIso] = useState<string | null>(null);
   const [exportHistoryPreview, setExportHistoryPreview] = useState<
-    ExportHistoryEntry[]
+    AdminExportHistoryEntry[]
   >([]);
 
   const getWordCount = (text: string): number =>
@@ -213,17 +186,25 @@ export const AdminPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!showExportModal) return;
-    setLastExportIso(loadLastExportIso());
-    setExportHistoryPreview(loadExportHistory().slice(0, 5));
-  }, [showExportModal]);
+    if (!showExportModal || !user?.uid) return;
+    let cancelled = false;
+    (async () => {
+      const p = await fetchAdminExportProfile(user.uid);
+      if (cancelled) return;
+      setLastExportIso(p.lastExportAt);
+      setExportHistoryPreview(p.history.slice(0, 5));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showExportModal, user?.uid]);
 
   const applyDateFilter = (list: ChatSession[]): ChatSession[] => {
-    const lastIso = loadLastExportIso();
+    const lastIso = lastExportIso;
     if (exportMode === "sinceLastExact") {
       if (!lastIso) {
         alert(
-          "No previous export recorded in this browser. Run an export once, or use a date range.",
+          "No previous export on your account yet. Run an export once, or pick a calendar range.",
         );
         return [];
       }
@@ -263,7 +244,12 @@ export const AdminPanel: React.FC = () => {
     return `${prefix}_${langSlug}${fromPart}${toPart}${modePart}_${dateSlug}.jsonl`;
   };
 
-  const downloadSFTData = () => {
+  const downloadSFTData = async () => {
+    const uid = user?.uid;
+    if (!uid) {
+      alert("You must be signed in to record export history.");
+      return;
+    }
     let sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
@@ -273,18 +259,27 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    const finishExportRecord = () => {
-      recordExport({
-        sessionCount: sessionsToExport.length,
-        lang: exportLanguage,
-        format: exportFormat,
-        mode: exportMode,
-        basis: exportDateBasis,
-        fromDate: exportDateFrom || undefined,
-        toDate: exportDateTo || undefined,
-      });
-      setLastExportIso(loadLastExportIso());
-      setExportHistoryPreview(loadExportHistory().slice(0, 5));
+    const finishExportRecord = async () => {
+      try {
+        await appendAdminExportHistory(uid, {
+          sessionCount: sessionsToExport.length,
+          lang: exportLanguage,
+          format: exportFormat,
+          mode: exportMode,
+          basis:
+            exportMode === "sinceLastExact" ? "lastUpdated" : exportDateBasis,
+          fromDate: exportDateFrom || undefined,
+          toDate: exportDateTo || undefined,
+        });
+        const p = await fetchAdminExportProfile(uid);
+        setLastExportIso(p.lastExportAt);
+        setExportHistoryPreview(p.history.slice(0, 5));
+      } catch (e) {
+        console.error(e);
+        alert(
+          "Download succeeded, but saving export history to your account failed.",
+        );
+      }
     };
 
     if (exportFormat === "messages") {
@@ -379,7 +374,7 @@ export const AdminPanel: React.FC = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      finishExportRecord();
+      await finishExportRecord();
       setShowExportModal(false);
       return;
     }
@@ -467,7 +462,7 @@ export const AdminPanel: React.FC = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    finishExportRecord();
+    await finishExportRecord();
     setShowExportModal(false);
   };
 
@@ -1337,19 +1332,93 @@ export const AdminPanel: React.FC = () => {
               <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 Date filter
               </div>
-              <select
-                value={exportMode}
-                onChange={(e) =>
-                  setExportMode(e.target.value as "range" | "sinceLastExact")
-                }
-                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              >
-                <option value="range">Calendar date range</option>
-                <option value="sinceLastExact">
-                  New since last export (exact time, this browser)
-                </option>
-              </select>
-              {exportMode === "range" && (
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Date range
+                </label>
+                <select
+                  value={exportDatePreset}
+                  onChange={(e) => {
+                    const v = e.target.value as ExportDatePreset;
+                    if (
+                      (v === "since_last" || v === "day_after_last_to_today") &&
+                      !lastExportIso
+                    ) {
+                      alert(
+                        "No previous export on your account yet. Export once, or pick All time / Today / Last 7 days / Custom.",
+                      );
+                      return;
+                    }
+                    setExportDatePreset(v);
+                    const today = formatLocalYmd(new Date());
+                    switch (v) {
+                      case "all":
+                        setExportMode("range");
+                        setExportDateFrom("");
+                        setExportDateTo("");
+                        break;
+                      case "today":
+                        setExportMode("range");
+                        setExportDateFrom(today);
+                        setExportDateTo(today);
+                        break;
+                      case "last7":
+                        setExportMode("range");
+                        setExportDateFrom(daysAgoYmd(6));
+                        setExportDateTo(today);
+                        break;
+                      case "last30":
+                        setExportMode("range");
+                        setExportDateFrom(daysAgoYmd(29));
+                        setExportDateTo(today);
+                        break;
+                      case "since_last":
+                        setExportMode("sinceLastExact");
+                        setExportDateFrom("");
+                        setExportDateTo("");
+                        break;
+                      case "day_after_last_to_today":
+                        setExportMode("range");
+                        if (lastExportIso) {
+                          setExportDateFrom(
+                            nextLocalDayYmdFromIso(lastExportIso),
+                          );
+                          setExportDateTo(today);
+                        }
+                        break;
+                      case "custom":
+                        setExportMode("range");
+                        break;
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  <option value="all">All time</option>
+                  <option value="today">Today</option>
+                  <option value="last7">Last 7 days</option>
+                  <option value="last30">Last 30 days</option>
+                  <option value="since_last">
+                    New since last export (exact time)
+                  </option>
+                  <option value="day_after_last_to_today">
+                    Day after last export → today
+                  </option>
+                  <option value="custom">Custom (manual dates)</option>
+                </select>
+              </div>
+
+              {["today", "last7", "last30", "day_after_last_to_today"].includes(
+                exportDatePreset,
+              ) && (
+                <p className="text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700">
+                    Using range:{" "}
+                  </span>
+                  {exportDateFrom || "—"} → {exportDateTo || "—"}
+                </p>
+              )}
+
+              {exportDatePreset === "custom" && (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -1375,38 +1444,17 @@ export const AdminPanel: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                      Match date against
-                    </label>
-                    <select
-                      value={exportDateBasis}
-                      onChange={(e) =>
-                        setExportDateBasis(
-                          e.target.value as "lastUpdated" | "startTime",
-                        )
-                      }
-                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                    >
-                      <option value="lastUpdated">
-                        Last activity (lastUpdated)
-                      </option>
-                      <option value="startTime">Session start (startTime)</option>
-                    </select>
-                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        const iso = loadLastExportIso();
-                        if (!iso) {
+                        if (!lastExportIso) {
                           alert(
-                            "No previous export in this browser yet. Export once, then use this.",
+                            "No previous export on your account yet. Export once, then use this.",
                           );
                           return;
                         }
-                        setExportMode("range");
-                        setExportDateFrom(nextLocalDayYmdFromIso(iso));
+                        setExportDateFrom(nextLocalDayYmdFromIso(lastExportIso));
                       }}
                       className="text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
                     >
@@ -1415,6 +1463,8 @@ export const AdminPanel: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        setExportDatePreset("all");
+                        setExportMode("range");
                         setExportDateFrom("");
                         setExportDateTo("");
                       }}
@@ -1425,36 +1475,60 @@ export const AdminPanel: React.FC = () => {
                   </div>
                 </>
               )}
-              {exportMode === "sinceLastExact" && (
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Includes sessions with{" "}
-                  <code className="bg-white px-1 rounded border border-slate-200">
-                    lastUpdated
-                  </code>{" "}
-                  after your last successful export in this browser. Optional{" "}
-                  <strong>To</strong> date below still caps the range.
-                </p>
-              )}
-              {exportMode === "sinceLastExact" && (
+
+              {exportMode === "range" && exportDatePreset !== "all" && (
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                    To (optional, caps &quot;since last&quot;)
+                    Match date against
                   </label>
-                  <input
-                    type="date"
-                    value={exportDateTo}
-                    onChange={(e) => setExportDateTo(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"
-                  />
+                  <select
+                    value={exportDateBasis}
+                    onChange={(e) =>
+                      setExportDateBasis(
+                        e.target.value as "lastUpdated" | "startTime",
+                      )
+                    }
+                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  >
+                    <option value="lastUpdated">
+                      Last activity (lastUpdated)
+                    </option>
+                    <option value="startTime">Session start (startTime)</option>
+                  </select>
                 </div>
               )}
+
+              {exportMode === "sinceLastExact" && (
+                <>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Includes sessions with{" "}
+                    <code className="bg-white px-1 rounded border border-slate-200">
+                      lastUpdated
+                    </code>{" "}
+                    at or after your last successful export (saved on your
+                    account). Optional <strong>To</strong> date caps the range.
+                  </p>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      To (optional, caps &quot;since last&quot;)
+                    </label>
+                    <input
+                      type="date"
+                      value={exportDateTo}
+                      onChange={(e) => setExportDateTo(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"
+                    />
+                  </div>
+                </>
+              )}
+
               {lastExportIso && (
                 <p className="text-[11px] text-slate-600">
                   <span className="font-semibold text-slate-800">
                     Latest export:{" "}
                   </span>
                   {new Date(lastExportIso).toLocaleString()}
-                  <span className="text-slate-400"> (stored in this browser)</span>
+                  <span className="text-slate-400"> (stored on your account)</span>
                 </p>
               )}
               {exportHistoryPreview.length > 0 && (

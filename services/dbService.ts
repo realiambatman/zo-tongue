@@ -430,6 +430,106 @@ export const fetchUserIP = async (): Promise<string | null> => {
   }
 };
 
+/** Admin training-data export history (per signed-in admin account). */
+export interface AdminExportHistoryEntry {
+  at: string;
+  fromDate?: string;
+  toDate?: string;
+  lang: string;
+  format: string;
+  mode: "range" | "sinceLastExact";
+  basis: "lastUpdated" | "startTime";
+  sessionCount: number;
+}
+
+const adminExportProfileRef = (uid: string) => doc(db, "adminExportProfiles", uid);
+
+const LS_EXPORT_LAST_LEGACY = "zotongue_admin_last_export_iso";
+const LS_EXPORT_HISTORY_LEGACY = "zotongue_admin_export_history";
+
+async function migrateAdminExportFromLocalStorage(uid: string): Promise<void> {
+  try {
+    const snap = await getDoc(adminExportProfileRef(uid));
+    const existing = snap.exists() ? snap.data() : null;
+    if (
+      existing?.lastExportAt ||
+      (Array.isArray(existing?.history) && existing.history.length > 0)
+    ) {
+      return;
+    }
+    let lsLast: string | null = null;
+    let lsHist: AdminExportHistoryEntry[] = [];
+    try {
+      lsLast = localStorage.getItem(LS_EXPORT_LAST_LEGACY);
+      const raw = localStorage.getItem(LS_EXPORT_HISTORY_LEGACY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AdminExportHistoryEntry[];
+        if (Array.isArray(parsed)) lsHist = parsed;
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!lsLast && lsHist.length === 0) return;
+    await setDoc(
+      adminExportProfileRef(uid),
+      {
+        lastExportAt: lsLast || null,
+        history: lsHist.slice(0, 30),
+        migratedAt: Date.now(),
+      },
+      { merge: true }
+    );
+  } catch (e) {
+    console.error("migrateAdminExportFromLocalStorage:", e);
+  }
+}
+
+export const fetchAdminExportProfile = async (
+  uid: string
+): Promise<{ lastExportAt: string | null; history: AdminExportHistoryEntry[] }> => {
+  try {
+    await migrateAdminExportFromLocalStorage(uid);
+    const snap = await getDoc(adminExportProfileRef(uid));
+    if (!snap.exists()) {
+      return { lastExportAt: null, history: [] };
+    }
+    const d = snap.data();
+    return {
+      lastExportAt: (d.lastExportAt as string) || null,
+      history: Array.isArray(d.history) ? d.history : [],
+    };
+  } catch (e) {
+    console.error("fetchAdminExportProfile:", e);
+    return { lastExportAt: null, history: [] };
+  }
+};
+
+export const appendAdminExportHistory = async (
+  uid: string,
+  entry: Omit<AdminExportHistoryEntry, "at">
+): Promise<void> => {
+  const row: AdminExportHistoryEntry = {
+    at: new Date().toISOString(),
+    ...entry,
+  };
+  const ref = adminExportProfileRef(uid);
+  const snap = await getDoc(ref);
+  const prev: AdminExportHistoryEntry[] =
+    snap.exists() && Array.isArray(snap.data()?.history)
+      ? (snap.data()!.history as AdminExportHistoryEntry[])
+      : [];
+  const history = [row, ...prev].slice(0, 30);
+  await setDoc(
+    ref,
+    {
+      lastExportAt: row.at,
+      history,
+      updatedAt: Date.now(),
+    },
+    { merge: true }
+  );
+};
+
 /**
  * Site maintenance mode functions
  */
