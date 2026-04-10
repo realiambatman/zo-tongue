@@ -17,6 +17,76 @@ import { MarkdownRenderer } from "./MarkdownRenderer";
 
 import { useNavigate } from "react-router-dom";
 
+const LS_EXPORT_LAST = "zotongue_admin_last_export_iso";
+const LS_EXPORT_HISTORY = "zotongue_admin_export_history";
+
+type ExportHistoryEntry = {
+  at: string;
+  fromDate?: string;
+  toDate?: string;
+  lang: string;
+  format: string;
+  mode: "range" | "sinceLastExact";
+  basis: "lastUpdated" | "startTime";
+  sessionCount: number;
+};
+
+function startOfLocalDayYmd(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+}
+
+function endOfLocalDayYmd(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
+}
+
+function formatLocalYmd(d: Date): string {
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${mo}-${day}`;
+}
+
+function nextLocalDayYmdFromIso(iso: string): string {
+  const d = new Date(iso);
+  d.setDate(d.getDate() + 1);
+  return formatLocalYmd(d);
+}
+
+function loadLastExportIso(): string | null {
+  try {
+    return localStorage.getItem(LS_EXPORT_LAST);
+  } catch {
+    return null;
+  }
+}
+
+function loadExportHistory(): ExportHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(LS_EXPORT_HISTORY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ExportHistoryEntry[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordExport(entry: Omit<ExportHistoryEntry, "at">) {
+  try {
+    const row: ExportHistoryEntry = { at: new Date().toISOString(), ...entry };
+    localStorage.setItem(LS_EXPORT_LAST, row.at);
+    const prev = loadExportHistory();
+    localStorage.setItem(
+      LS_EXPORT_HISTORY,
+      JSON.stringify([row, ...prev].slice(0, 30)),
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
 export const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const onBack = () => navigate("/");
@@ -42,6 +112,20 @@ export const AdminPanel: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
     "messages",
   );
+  /** YYYY-MM-DD; empty = no bound */
+  const [exportDateFrom, setExportDateFrom] = useState("");
+  const [exportDateTo, setExportDateTo] = useState("");
+  const [exportDateBasis, setExportDateBasis] = useState<
+    "lastUpdated" | "startTime"
+  >("lastUpdated");
+  /** Exact incremental: sessions with lastUpdated >= last export time */
+  const [exportMode, setExportMode] = useState<"range" | "sinceLastExact">(
+    "range",
+  );
+  const [lastExportIso, setLastExportIso] = useState<string | null>(null);
+  const [exportHistoryPreview, setExportHistoryPreview] = useState<
+    ExportHistoryEntry[]
+  >([]);
 
   const getWordCount = (text: string): number =>
     text.trim().split(/\s+/).filter(Boolean).length;
@@ -128,13 +212,80 @@ export const AdminPanel: React.FC = () => {
     return !hasPayloadMarker && getWordCount(t) <= 6;
   };
 
-  const downloadSFTData = () => {
-    const sessionsToExport = sessions.filter(
-      (s) => exportLanguage === "All" || s.language === exportLanguage,
-    );
+  useEffect(() => {
+    if (!showExportModal) return;
+    setLastExportIso(loadLastExportIso());
+    setExportHistoryPreview(loadExportHistory().slice(0, 5));
+  }, [showExportModal]);
 
+  const applyDateFilter = (list: ChatSession[]): ChatSession[] => {
+    const lastIso = loadLastExportIso();
+    if (exportMode === "sinceLastExact") {
+      if (!lastIso) {
+        alert(
+          "No previous export recorded in this browser. Run an export once, or use a date range.",
+        );
+        return [];
+      }
+      const t0 = new Date(lastIso).getTime();
+      let out = list.filter((s) => s.lastUpdated >= t0);
+      if (exportDateTo.trim()) {
+        const toMs = endOfLocalDayYmd(exportDateTo.trim());
+        out = out.filter((s) => s.lastUpdated <= toMs);
+      }
+      return out;
+    }
+
+    let out = list;
+    const getT = (s: ChatSession) =>
+      exportDateBasis === "startTime" ? s.startTime : s.lastUpdated;
+
+    if (exportDateFrom.trim()) {
+      const fromMs = startOfLocalDayYmd(exportDateFrom.trim());
+      out = out.filter((s) => getT(s) >= fromMs);
+    }
+    if (exportDateTo.trim()) {
+      const toMs = endOfLocalDayYmd(exportDateTo.trim());
+      out = out.filter((s) => getT(s) <= toMs);
+    }
+    return out;
+  };
+
+  const buildExportFilename = (prefix: string): string => {
     const langSlug = exportLanguage.toLowerCase().replace(/\s+/g, "_");
     const dateSlug = new Date().toISOString().slice(0, 10);
+    const fromPart = exportDateFrom.trim()
+      ? `_from_${exportDateFrom.trim()}`
+      : "";
+    const toPart = exportDateTo.trim() ? `_to_${exportDateTo.trim()}` : "";
+    const modePart =
+      exportMode === "sinceLastExact" ? "_since_last_export" : "";
+    return `${prefix}_${langSlug}${fromPart}${toPart}${modePart}_${dateSlug}.jsonl`;
+  };
+
+  const downloadSFTData = () => {
+    let sessionsToExport = sessions.filter(
+      (s) => exportLanguage === "All" || s.language === exportLanguage,
+    );
+    sessionsToExport = applyDateFilter(sessionsToExport);
+    if (sessionsToExport.length === 0) {
+      alert("No sessions match the current filters.");
+      return;
+    }
+
+    const finishExportRecord = () => {
+      recordExport({
+        sessionCount: sessionsToExport.length,
+        lang: exportLanguage,
+        format: exportFormat,
+        mode: exportMode,
+        basis: exportDateBasis,
+        fromDate: exportDateFrom || undefined,
+        toDate: exportDateTo || undefined,
+      });
+      setLastExportIso(loadLastExportIso());
+      setExportHistoryPreview(loadExportHistory().slice(0, 5));
+    };
 
     if (exportFormat === "messages") {
       const lines: string[] = [];
@@ -211,17 +362,24 @@ export const AdminPanel: React.FC = () => {
       });
 
       const jsonlContent = lines.join("\n");
+      if (!jsonlContent.trim()) {
+        alert(
+          "No training rows produced for this date range (all pairs filtered out).",
+        );
+        return;
+      }
       const blob = new Blob([jsonlContent], {
         type: "application/jsonlines",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `chat_messages_${langSlug}_${dateSlug}.jsonl`;
+      a.download = buildExportFilename("chat_messages");
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      finishExportRecord();
       setShowExportModal(false);
       return;
     }
@@ -292,17 +450,24 @@ export const AdminPanel: React.FC = () => {
     });
 
     const jsonlContent = sftLines.join("\n");
+    if (!jsonlContent.trim()) {
+      alert(
+        "No training rows produced for this date range (all pairs filtered out).",
+      );
+      return;
+    }
     const blob = new Blob([jsonlContent], {
       type: "application/jsonlines",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sft_data_${langSlug}_${dateSlug}.jsonl`;
+    a.download = buildExportFilename("sft_data");
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    finishExportRecord();
     setShowExportModal(false);
   };
 
@@ -1146,7 +1311,7 @@ export const AdminPanel: React.FC = () => {
       {/* Export Modal */}
       {showExportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-ink mb-4">
               Export training data
             </h3>
@@ -1167,6 +1332,151 @@ export const AdminPanel: React.FC = () => {
               <code className="text-xs bg-slate-100 px-1 rounded">input</code>{" "}
               is left empty for now.
             </p>
+
+            <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Date filter
+              </div>
+              <select
+                value={exportMode}
+                onChange={(e) =>
+                  setExportMode(e.target.value as "range" | "sinceLastExact")
+                }
+                className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              >
+                <option value="range">Calendar date range</option>
+                <option value="sinceLastExact">
+                  New since last export (exact time, this browser)
+                </option>
+              </select>
+              {exportMode === "range" && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        From (inclusive)
+                      </label>
+                      <input
+                        type="date"
+                        value={exportDateFrom}
+                        onChange={(e) => setExportDateFrom(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                        To (inclusive, optional)
+                      </label>
+                      <input
+                        type="date"
+                        value={exportDateTo}
+                        onChange={(e) => setExportDateTo(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                      Match date against
+                    </label>
+                    <select
+                      value={exportDateBasis}
+                      onChange={(e) =>
+                        setExportDateBasis(
+                          e.target.value as "lastUpdated" | "startTime",
+                        )
+                      }
+                      className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                    >
+                      <option value="lastUpdated">
+                        Last activity (lastUpdated)
+                      </option>
+                      <option value="startTime">Session start (startTime)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const iso = loadLastExportIso();
+                        if (!iso) {
+                          alert(
+                            "No previous export in this browser yet. Export once, then use this.",
+                          );
+                          return;
+                        }
+                        setExportMode("range");
+                        setExportDateFrom(nextLocalDayYmdFromIso(iso));
+                      }}
+                      className="text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                    >
+                      Set From = day after last export
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportDateFrom("");
+                        setExportDateTo("");
+                      }}
+                      className="text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                    >
+                      Clear dates
+                    </button>
+                  </div>
+                </>
+              )}
+              {exportMode === "sinceLastExact" && (
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Includes sessions with{" "}
+                  <code className="bg-white px-1 rounded border border-slate-200">
+                    lastUpdated
+                  </code>{" "}
+                  after your last successful export in this browser. Optional{" "}
+                  <strong>To</strong> date below still caps the range.
+                </p>
+              )}
+              {exportMode === "sinceLastExact" && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    To (optional, caps &quot;since last&quot;)
+                  </label>
+                  <input
+                    type="date"
+                    value={exportDateTo}
+                    onChange={(e) => setExportDateTo(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+              {lastExportIso && (
+                <p className="text-[11px] text-slate-600">
+                  <span className="font-semibold text-slate-800">
+                    Latest export:{" "}
+                  </span>
+                  {new Date(lastExportIso).toLocaleString()}
+                  <span className="text-slate-400"> (stored in this browser)</span>
+                </p>
+              )}
+              {exportHistoryPreview.length > 0 && (
+                <details className="text-xs text-slate-600">
+                  <summary className="cursor-pointer font-semibold text-slate-700">
+                    Recent export history ({exportHistoryPreview.length})
+                  </summary>
+                  <ul className="mt-2 space-y-1 pl-2 border-l border-slate-200">
+                    {exportHistoryPreview.map((h, idx) => (
+                      <li key={idx} className="font-mono text-[10px] leading-relaxed">
+                        {new Date(h.at).toLocaleString()} · {h.format} ·{" "}
+                        {h.lang} · {h.sessionCount} sessions ·{" "}
+                        {h.mode === "sinceLastExact"
+                          ? "since last"
+                          : `${h.fromDate || "—"}→${h.toDate || "—"}`}{" "}
+                        · {h.basis}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
 
             <div className="mb-4">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
