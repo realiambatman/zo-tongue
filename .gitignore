@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Server directory (has its own separate git repository)
+server/
+
 # Environment variables (SECURITY: Never commit API keys!)
 .env
 .env.local

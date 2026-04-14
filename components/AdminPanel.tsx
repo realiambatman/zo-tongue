@@ -318,6 +318,13 @@ export const AdminPanel: React.FC = () => {
         const messagesWithThoughts: Array<{
           role: "user" | "assistant";
           content: string;
+          thoughts?: string;
+          usage?: {
+            thoughtsTokenCount?: number;
+            candidatesTokenCount?: number;
+            promptTokenCount?: number;
+            totalTokenCount?: number;
+          };
         }> = [];
         let hasAnyThoughtData = false;
         const msgs = session.messages;
@@ -361,20 +368,30 @@ export const AdminPanel: React.FC = () => {
           messagesWithoutThoughts.push({ role: "user", content: userText });
           messagesWithoutThoughts.push({ role: "assistant", content: assistantText });
 
-          const thoughtText = (nextMsg.thoughts || "").trim();
-          messagesWithThoughts.push({ role: "user", content: userText });
-          if (thoughtText) {
+          const assistantWithThoughts: {
+            role: "assistant";
+            content: string;
+            thoughts?: string;
+            usage?: {
+              thoughtsTokenCount?: number;
+              candidatesTokenCount?: number;
+              promptTokenCount?: number;
+              totalTokenCount?: number;
+            };
+          } = {
+            role: "assistant",
+            content: assistantText,
+          };
+          if (nextMsg.thoughts && nextMsg.thoughts.trim()) {
+            assistantWithThoughts.thoughts = nextMsg.thoughts.trim();
             hasAnyThoughtData = true;
-            messagesWithThoughts.push({
-              role: "assistant",
-              content: `<think>\n${thoughtText}\n</think>\n${assistantText}`,
-            });
-          } else {
-            messagesWithThoughts.push({
-              role: "assistant",
-              content: assistantText,
-            });
           }
+          if (nextMsg.usage) {
+            assistantWithThoughts.usage = nextMsg.usage;
+            hasAnyThoughtData = true;
+          }
+          messagesWithThoughts.push({ role: "user", content: userText });
+          messagesWithThoughts.push(assistantWithThoughts);
         }
 
         const assistantCount = messagesWithoutThoughts.filter(
@@ -450,6 +467,13 @@ export const AdminPanel: React.FC = () => {
       instruction: string;
       input: string;
       output: string;
+      thoughts?: string;
+      usage?: {
+        thoughtsTokenCount?: number;
+        candidatesTokenCount?: number;
+        promptTokenCount?: number;
+        totalTokenCount?: number;
+      };
     }> = [];
     const sftLinesWithoutThoughts: string[] = [];
     const sftLinesWithThoughts: string[] = [];
@@ -499,13 +523,30 @@ export const AdminPanel: React.FC = () => {
             input: "",
             output: outputText,
           });
-          const thoughtText = (nextMsg.thoughts || "").trim();
-          if (thoughtText) {
-            sftDataWithThoughts.push({
-              instruction: userText,
-              input: "",
-              output: `<think>\n${thoughtText}\n</think>\n${outputText}`,
-            });
+          const thoughtRow: {
+            instruction: string;
+            input: string;
+            output: string;
+            thoughts?: string;
+            usage?: {
+              thoughtsTokenCount?: number;
+              candidatesTokenCount?: number;
+              promptTokenCount?: number;
+              totalTokenCount?: number;
+            };
+          } = {
+            instruction: userText,
+            input: "",
+            output: outputText,
+          };
+          if (nextMsg.thoughts && nextMsg.thoughts.trim()) {
+            thoughtRow.thoughts = nextMsg.thoughts.trim();
+          }
+          if (nextMsg.usage) {
+            thoughtRow.usage = nextMsg.usage;
+          }
+          if (thoughtRow.thoughts || thoughtRow.usage) {
+            sftDataWithThoughts.push(thoughtRow);
             hasThoughtRowsInSession = true;
           }
         }
@@ -1733,12 +1774,11 @@ export const AdminPanel: React.FC = () => {
                   onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                Include assistant thoughts in <code>&lt;think&gt;</code> tags (if available)
+                Include assistant thoughts/usage in export rows (if available)
               </label>
               <p className="mt-1 text-[11px] text-slate-500">
-                When enabled, adds a separate WITH THOUGHTS section where
-                assistant reasoning is embedded in <code>&lt;think&gt;...&lt;/think&gt;</code>{" "}
-                for both Chat messages and SFT rows.
+                Includes assistant <code>thoughts</code> and token usage fields
+                in both Chat messages and SFT JSONL rows.
               </p>
             </div>
 
