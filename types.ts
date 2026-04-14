@@ -33,6 +33,7 @@ export interface ChatMessage {
   isSystem?: boolean;
   isAdminReply?: boolean; // New flag for admin replies
   image?: string; // Base64 or URL for solver images
+  thoughts?: string; // Optional reasoning/thought text if backend provides it
   usage?: {
     thoughtsTokenCount?: number;
     candidatesTokenCount?: number;

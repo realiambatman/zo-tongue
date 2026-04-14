@@ -326,6 +326,7 @@ class SecureChatSession {
     // Fixed: Yield ONLY new characters, UI will accumulate
     async function* streamGenerator() {
       const fullText = response.text || "";
+      const thoughts = response.thoughts;
       const usageMetadata = response.usage;
       const sources = response.sources;
 
@@ -347,6 +348,7 @@ class SecureChatSession {
       // Final yield with usage metadata and sources (no text)
       yield {
         text: "",
+        thoughts: thoughts,
         usageMetadata: usageMetadata,
         sources: sources,
       };

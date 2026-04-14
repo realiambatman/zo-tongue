@@ -844,6 +844,7 @@ export const ChatInterface: React.FC = () => {
       // Create placeholder message for streaming response
       const botMsgId = (Date.now() + 1).toString();
       let fullResponseText = "";
+      let finalThoughts: string | undefined = undefined;
       let finalUsage = undefined;
       let finalSources: Array<{ title: string; url: string }> | undefined =
         undefined;
@@ -868,6 +869,10 @@ export const ChatInterface: React.FC = () => {
 
         if ((chunk as any).usageMetadata) {
           finalUsage = (chunk as any).usageMetadata;
+        }
+
+        if ((chunk as any).thoughts) {
+          finalThoughts = String((chunk as any).thoughts);
         }
 
         if ((chunk as any).sources) {
@@ -913,6 +918,10 @@ export const ChatInterface: React.FC = () => {
                       totalTokenCount: finalUsage.totalTokenCount || 0,
                     }
                   : undefined,
+                thoughts:
+                  finalThoughts && finalThoughts.trim().length > 0
+                    ? finalThoughts.trim()
+                    : undefined,
                 sources:
                   finalSources && finalSources.length > 0
                     ? finalSources

@@ -127,6 +127,8 @@ export const saveChatSession = async (session: ChatSession) => {
         cleaned.isAdminReply = msg.isAdminReply;
       if (msg.image !== undefined && msg.image !== null)
         cleaned.image = msg.image;
+      if (msg.thoughts !== undefined && msg.thoughts !== null)
+        cleaned.thoughts = msg.thoughts;
 
       // Clean usage object to remove undefined values
       if (msg.usage !== undefined && msg.usage !== null) {

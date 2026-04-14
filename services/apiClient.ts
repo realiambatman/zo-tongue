@@ -70,6 +70,7 @@ export const apiClient = {
     signal?: AbortSignal
   ): Promise<{
     text: string;
+    thoughts?: string;
     usage?: any;
     sources?: Array<{ title: string; url: string }>;
   }> {

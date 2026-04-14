@@ -89,6 +89,7 @@ export const AdminPanel: React.FC = () => {
   const [exportDateBasis, setExportDateBasis] = useState<
     "lastUpdated" | "startTime"
   >("lastUpdated");
+  const [includeThoughtsInExport, setIncludeThoughtsInExport] = useState(false);
   /** Exact incremental: sessions with lastUpdated >= last export time */
   const [exportMode, setExportMode] = useState<"range" | "sinceLastExact">(
     "range",
@@ -291,10 +292,14 @@ export const AdminPanel: React.FC = () => {
     };
 
     if (exportFormat === "messages") {
-      const lines: string[] = [];
-      const addLanguageHeaderIfNeeded = (language: string) => {
+      const linesWithoutThoughts: string[] = [];
+      const linesWithThoughts: string[] = [];
+      const addLanguageHeaderIfNeeded = (
+        language: string,
+        target: string[],
+      ) => {
         if (exportLanguage !== "All") return;
-        lines.push(
+        target.push(
           JSON.stringify({ comment: `=== Language: ${language} ===` }),
         );
       };
@@ -302,18 +307,26 @@ export const AdminPanel: React.FC = () => {
       const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
         (a.language || "").localeCompare(b.language || ""),
       );
-      let currentLanguageHeader = "";
+      let currentLanguageHeaderWithout = "";
+      let currentLanguageHeaderWith = "";
 
       sessionsByLanguage.forEach((session) => {
-        if (
-          exportLanguage === "All" &&
-          session.language !== currentLanguageHeader
-        ) {
-          currentLanguageHeader = session.language;
-          addLanguageHeaderIfNeeded(session.language);
-        }
-
-        const messages: { role: "user" | "assistant"; content: string }[] = [];
+        const messagesWithoutThoughts: Array<{
+          role: "user" | "assistant";
+          content: string;
+        }> = [];
+        const messagesWithThoughts: Array<{
+          role: "user" | "assistant";
+          content: string;
+          thoughts?: string;
+          usage?: {
+            thoughtsTokenCount?: number;
+            candidatesTokenCount?: number;
+            promptTokenCount?: number;
+            totalTokenCount?: number;
+          };
+        }> = [];
+        let hasAnyThoughtData = false;
         const msgs = session.messages;
         for (let i = 0; i < msgs.length - 1; i++) {
           const currentMsg = msgs[i];
@@ -352,18 +365,76 @@ export const AdminPanel: React.FC = () => {
             continue;
           }
 
-          messages.push({ role: "user", content: userText });
-          messages.push({ role: "assistant", content: assistantText });
+          messagesWithoutThoughts.push({ role: "user", content: userText });
+          messagesWithoutThoughts.push({ role: "assistant", content: assistantText });
+
+          const assistantWithThoughts: {
+            role: "assistant";
+            content: string;
+            thoughts?: string;
+            usage?: {
+              thoughtsTokenCount?: number;
+              candidatesTokenCount?: number;
+              promptTokenCount?: number;
+              totalTokenCount?: number;
+            };
+          } = {
+            role: "assistant",
+            content: assistantText,
+          };
+          if (nextMsg.thoughts && nextMsg.thoughts.trim()) {
+            assistantWithThoughts.thoughts = nextMsg.thoughts.trim();
+            hasAnyThoughtData = true;
+          }
+          if (nextMsg.usage) {
+            assistantWithThoughts.usage = nextMsg.usage;
+            hasAnyThoughtData = true;
+          }
+          messagesWithThoughts.push({ role: "user", content: userText });
+          messagesWithThoughts.push(assistantWithThoughts);
         }
 
-        const assistantCount = messages.filter(
+        const assistantCount = messagesWithoutThoughts.filter(
           (m) => m.role === "assistant",
         ).length;
-        if (messages.length > 0 && assistantCount >= 1) {
-          lines.push(JSON.stringify({ messages }));
+        if (messagesWithoutThoughts.length > 0 && assistantCount >= 1) {
+          if (exportLanguage === "All") {
+            if (session.language !== currentLanguageHeaderWithout) {
+              currentLanguageHeaderWithout = session.language;
+              addLanguageHeaderIfNeeded(session.language, linesWithoutThoughts);
+            }
+            if (hasAnyThoughtData) {
+              if (session.language !== currentLanguageHeaderWith) {
+                currentLanguageHeaderWith = session.language;
+                addLanguageHeaderIfNeeded(session.language, linesWithThoughts);
+              }
+            }
+          }
+          linesWithoutThoughts.push(
+            JSON.stringify({ messages: messagesWithoutThoughts }),
+          );
+          if (hasAnyThoughtData) {
+            linesWithThoughts.push(
+              JSON.stringify({ messages: messagesWithThoughts }),
+            );
+          }
         }
       });
 
+      const lines: string[] = includeThoughtsInExport
+        ? [
+            JSON.stringify({ comment: "=== WITHOUT THOUGHTS ===" }),
+            ...linesWithoutThoughts,
+            JSON.stringify({ comment: "=== WITH THOUGHTS ===" }),
+            ...(linesWithThoughts.length > 0
+              ? linesWithThoughts
+              : [
+                  JSON.stringify({
+                    comment: "(no thought data found in selected rows)",
+                  }),
+                ]),
+          ]
+        : linesWithoutThoughts;
       const jsonlContent = lines.join("\n");
       if (!jsonlContent.trim()) {
         alert(
@@ -387,24 +458,33 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    const sftData: { instruction: string; input: string; output: string }[] =
-      [];
-    const sftLines: string[] = [];
+    const sftDataWithoutThoughts: Array<{
+      instruction: string;
+      input: string;
+      output: string;
+    }> = [];
+    const sftDataWithThoughts: Array<{
+      instruction: string;
+      input: string;
+      output: string;
+      thoughts?: string;
+      usage?: {
+        thoughtsTokenCount?: number;
+        candidatesTokenCount?: number;
+        promptTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    }> = [];
+    const sftLinesWithoutThoughts: string[] = [];
+    const sftLinesWithThoughts: string[] = [];
     const sessionsByLanguage = [...sessionsToExport].sort((a, b) =>
       (a.language || "").localeCompare(b.language || ""),
     );
-    let currentLanguageHeader = "";
+    let currentLanguageHeaderWithout = "";
+    let currentLanguageHeaderWith = "";
 
     sessionsByLanguage.forEach((session) => {
-      if (
-        exportLanguage === "All" &&
-        session.language !== currentLanguageHeader
-      ) {
-        currentLanguageHeader = session.language;
-        sftLines.push(
-          JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
-        );
-      }
+      let hasThoughtRowsInSession = false;
 
       const msgs = session.messages;
       for (let i = 0; i < msgs.length - 1; i++) {
@@ -438,20 +518,80 @@ export const AdminPanel: React.FC = () => {
           if (isErrorLikeLine(userText) || isErrorLikeLine(outputText))
             continue;
 
-          sftData.push({
+          sftDataWithoutThoughts.push({
             instruction: userText,
             input: "",
             output: outputText,
           });
+          const thoughtRow: {
+            instruction: string;
+            input: string;
+            output: string;
+            thoughts?: string;
+            usage?: {
+              thoughtsTokenCount?: number;
+              candidatesTokenCount?: number;
+              promptTokenCount?: number;
+              totalTokenCount?: number;
+            };
+          } = {
+            instruction: userText,
+            input: "",
+            output: outputText,
+          };
+          if (nextMsg.thoughts && nextMsg.thoughts.trim()) {
+            thoughtRow.thoughts = nextMsg.thoughts.trim();
+          }
+          if (nextMsg.usage) {
+            thoughtRow.usage = nextMsg.usage;
+          }
+          if (thoughtRow.thoughts || thoughtRow.usage) {
+            sftDataWithThoughts.push(thoughtRow);
+            hasThoughtRowsInSession = true;
+          }
         }
       }
 
-      if (sftData.length > 0) {
-        sftLines.push(...sftData.map((item) => JSON.stringify(item)));
-        sftData.length = 0;
+      if (sftDataWithoutThoughts.length > 0) {
+        if (exportLanguage === "All" && session.language !== currentLanguageHeaderWithout) {
+          currentLanguageHeaderWithout = session.language;
+          sftLinesWithoutThoughts.push(
+            JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
+          );
+        }
+        sftLinesWithoutThoughts.push(
+          ...sftDataWithoutThoughts.map((item) => JSON.stringify(item)),
+        );
+        sftDataWithoutThoughts.length = 0;
+      }
+      if (sftDataWithThoughts.length > 0 && hasThoughtRowsInSession) {
+        if (exportLanguage === "All" && session.language !== currentLanguageHeaderWith) {
+          currentLanguageHeaderWith = session.language;
+          sftLinesWithThoughts.push(
+            JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
+          );
+        }
+        sftLinesWithThoughts.push(
+          ...sftDataWithThoughts.map((item) => JSON.stringify(item)),
+        );
+        sftDataWithThoughts.length = 0;
       }
     });
 
+    const sftLines: string[] = includeThoughtsInExport
+      ? [
+          JSON.stringify({ comment: "=== WITHOUT THOUGHTS ===" }),
+          ...sftLinesWithoutThoughts,
+          JSON.stringify({ comment: "=== WITH THOUGHTS ===" }),
+          ...(sftLinesWithThoughts.length > 0
+            ? sftLinesWithThoughts
+            : [
+                JSON.stringify({
+                  comment: "(no thought data found in selected rows)",
+                }),
+              ]),
+        ]
+      : sftLinesWithoutThoughts;
     const jsonlContent = sftLines.join("\n");
     if (!jsonlContent.trim()) {
       alert(
@@ -1624,6 +1764,22 @@ export const AdminPanel: React.FC = () => {
                   SFT instruction / input / output (JSONL)
                 </option>
               </select>
+            </div>
+
+            <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={includeThoughtsInExport}
+                  onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
+                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Include assistant thoughts/usage in export rows (if available)
+              </label>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Includes assistant <code>thoughts</code> and token usage fields
+                in both Chat messages and SFT JSONL rows.
+              </p>
             </div>
 
             <div className="mb-6">
