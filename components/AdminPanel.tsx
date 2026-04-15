@@ -508,7 +508,7 @@ export const AdminPanel: React.FC = () => {
             sftDataWithThoughts.push({
               instruction: userText,
               input: "",
-              output: `<redacted_thinking>\n${thoughtText}\n</redacted_thinking>\n${outputDisplay}`,
+              output: `<think>\n${thoughtText}\n</think>\n${outputDisplay}`,
             });
             hasThoughtRowsInSession = true;
           }
