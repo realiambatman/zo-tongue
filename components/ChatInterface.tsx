@@ -16,7 +16,6 @@ import { ChatHistoryItem } from "../services/apiClient";
 import { LanguageSelector } from "./LanguageSelector";
 import { Chat, Content } from "@google/genai";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { ModelThoughtsCollapsible } from "./ModelThoughtsCollapsible";
 import {
   extractThinkBlockFromModelText,
   getModelMessageParts,
@@ -504,17 +503,10 @@ export const ChatInterface: React.FC = () => {
                 {msg.role === "user" ? (
                   msg.text
                 ) : (
-                  <>
-                    <MarkdownRenderer
-                      content={modelParts?.displayText ?? ""}
-                      className={msg.isError ? "text-red-800 prose-red" : ""}
-                    />
-                    {!msg.isError && (
-                      <ModelThoughtsCollapsible
-                        thoughtsText={modelParts?.thoughtsText}
-                      />
-                    )}
-                  </>
+                  <MarkdownRenderer
+                    content={modelParts?.displayText ?? ""}
+                    className={msg.isError ? "text-red-800 prose-red" : ""}
+                  />
                 )}
               </div>
               <span
