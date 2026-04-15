@@ -41,6 +41,27 @@ const PERSONAL_QUESTION_PATTERN =
 // ... imports remain the same
 
 export const ChatInterface: React.FC = () => {
+  const extractThinkBlock = (
+    text: string,
+  ): { thoughts?: string; cleanedText: string } => {
+    if (!text) return { cleanedText: text };
+    const m = text.match(
+      /<redacted_thinking>\s*([\s\S]*?)\s*<\/redacted_thinking>/i,
+    );
+    if (!m) return { cleanedText: text };
+    const thoughts = (m[1] || "").trim();
+    const cleanedText = text
+      .replace(
+        /<redacted_thinking>\s*[\s\S]*?\s*<\/redacted_thinking>\s*/i,
+        "",
+      )
+      .trim();
+    return {
+      thoughts: thoughts || undefined,
+      cleanedText: cleanedText || text,
+    };
+  };
+
   const { sessionId: routeSessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
@@ -894,6 +915,10 @@ export const ChatInterface: React.FC = () => {
       // Check if response is empty and mark as error
       const isEmptyResponse =
         !fullResponseText || fullResponseText.trim().length === 0;
+      const parsed = extractThinkBlock(fullResponseText);
+      const normalizedText = parsed.cleanedText;
+      const normalizedThoughts =
+        (finalThoughts && finalThoughts.trim()) || parsed.thoughts;
 
       // Final update with usage metadata and sources
       setMessages((prev) =>
@@ -903,10 +928,10 @@ export const ChatInterface: React.FC = () => {
                 ...msg,
                 text: isEmptyResponse
                   ? "Sorry, I couldn't generate a response. Please try again."
-                  : fullResponseText,
+                  : normalizedText,
                 isError:
                   isEmptyResponse ||
-                  fullResponseText.includes(
+                  normalizedText.includes(
                     "That is not the selected language"
                   ),
                 usage: finalUsage
@@ -919,8 +944,8 @@ export const ChatInterface: React.FC = () => {
                     }
                   : undefined,
                 thoughts:
-                  finalThoughts && finalThoughts.trim().length > 0
-                    ? finalThoughts.trim()
+                  normalizedThoughts && normalizedThoughts.trim().length > 0
+                    ? normalizedThoughts.trim()
                     : undefined,
                 sources:
                   finalSources && finalSources.length > 0
