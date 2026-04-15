@@ -12,4 +12,4 @@ export const LANGUAGE_OPTIONS: SupportedLanguage[] = [
   SupportedLanguage.Gangte,
 ];
 
-export const MODEL_NAME = "gemini-3-pro-preview";
+export const MODEL_NAME = "gemini-3.1-pro-preview";

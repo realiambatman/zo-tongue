@@ -17,6 +17,8 @@ import {
 } from "../services/dbService";
 import { ChatMessage, SessionType, SupportedLanguage } from "../types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { ModelThoughtsCollapsible } from "./ModelThoughtsCollapsible";
+import { getModelMessageParts } from "../utils/thinkBlock";
 
 import { useNavigate } from "react-router-dom";
 
@@ -338,8 +340,9 @@ export const AdminPanel: React.FC = () => {
           const userText = normalizeTranslationLabel(
             (currentMsg.text || "").trim(),
           );
+          const assistantParts = getModelMessageParts(nextMsg);
           const assistantText = normalizeTranslationLabel(
-            (nextMsg.text || "").trim(),
+            (assistantParts.displayText || "").trim(),
           );
 
           if (!userText || !assistantText) continue;
@@ -362,7 +365,7 @@ export const AdminPanel: React.FC = () => {
           messagesWithoutThoughts.push({ role: "assistant", content: assistantText });
 
           messagesWithThoughts.push({ role: "user", content: userText });
-          const thoughtText = (nextMsg.thoughts || "").trim();
+          const thoughtText = (assistantParts.thoughtsText || "").trim();
           if (thoughtText) {
             hasAnyThoughtData = true;
             messagesWithThoughts.push({
@@ -487,24 +490,25 @@ export const AdminPanel: React.FC = () => {
           if (isContextlessTranslatePrompt(userText)) {
             continue;
           }
-          const outputText = normalizeTranslationLabel(
-            (nextMsg.text || "").trim(),
+          const outputParts = getModelMessageParts(nextMsg);
+          const outputDisplay = normalizeTranslationLabel(
+            (outputParts.displayText || "").trim(),
           );
-          if (!outputText || isRefusalLine(outputText)) continue;
-          if (isErrorLikeLine(userText) || isErrorLikeLine(outputText))
+          if (!outputDisplay || isRefusalLine(outputDisplay)) continue;
+          if (isErrorLikeLine(userText) || isErrorLikeLine(outputDisplay))
             continue;
 
           sftDataWithoutThoughts.push({
             instruction: userText,
             input: "",
-            output: outputText,
+            output: outputDisplay,
           });
-          const thoughtText = (nextMsg.thoughts || "").trim();
+          const thoughtText = (outputParts.thoughtsText || "").trim();
           if (thoughtText) {
             sftDataWithThoughts.push({
               instruction: userText,
               input: "",
-              output: `<think>\n${thoughtText}\n</think>\n${outputText}`,
+              output: `<redacted_thinking>\n${thoughtText}\n</redacted_thinking>\n${outputDisplay}`,
             });
             hasThoughtRowsInSession = true;
           }
@@ -1269,6 +1273,10 @@ export const AdminPanel: React.FC = () => {
                     // User messages are "incoming" (left)
                     // AI/Admin messages are "outgoing" (right)
                     const isIncoming = msg.role === "user";
+                    const aiParts =
+                      !isIncoming && !msg.isAdminReply
+                        ? getModelMessageParts(msg)
+                        : null;
 
                     return (
                       <div
@@ -1340,7 +1348,14 @@ export const AdminPanel: React.FC = () => {
                             {msg.role === "user" || msg.isAdminReply ? (
                               msg.text
                             ) : (
-                              <MarkdownRenderer content={msg.text} />
+                              <>
+                                <MarkdownRenderer
+                                  content={aiParts?.displayText ?? ""}
+                                />
+                                <ModelThoughtsCollapsible
+                                  thoughtsText={aiParts?.thoughtsText}
+                                />
+                              </>
                             )}
                           </div>
                           <span
@@ -1733,13 +1748,15 @@ export const AdminPanel: React.FC = () => {
                   onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
                   className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
-                Include assistant thoughts in <code>&lt;think&gt;</code> tags (if available)
+                Include assistant reasoning in{" "}
+                <code>&lt;think&gt;...&lt;/think&gt;</code> blocks (if available)
               </label>
               <p className="mt-1 text-[11px] text-slate-500">
                 When enabled, adds a separate WITH THOUGHTS section where
                 assistant reasoning is embedded in{" "}
                 <code>&lt;think&gt;...&lt;/think&gt;</code> for both Chat
-                messages and SFT rows.
+                messages and SFT rows. The WITHOUT THOUGHTS section is the
+                visible answer only (no tags).
               </p>
             </div>
 

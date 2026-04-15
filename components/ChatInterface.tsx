@@ -16,6 +16,11 @@ import { ChatHistoryItem } from "../services/apiClient";
 import { LanguageSelector } from "./LanguageSelector";
 import { Chat, Content } from "@google/genai";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { ModelThoughtsCollapsible } from "./ModelThoughtsCollapsible";
+import {
+  extractThinkBlockFromModelText,
+  getModelMessageParts,
+} from "../utils/thinkBlock";
 import { useAuth } from "../contexts/AuthContext";
 import {
   createNewSession,
@@ -41,27 +46,6 @@ const PERSONAL_QUESTION_PATTERN =
 // ... imports remain the same
 
 export const ChatInterface: React.FC = () => {
-  const extractThinkBlock = (
-    text: string,
-  ): { thoughts?: string; cleanedText: string } => {
-    if (!text) return { cleanedText: text };
-    const m = text.match(
-      /<redacted_thinking>\s*([\s\S]*?)\s*<\/redacted_thinking>/i,
-    );
-    if (!m) return { cleanedText: text };
-    const thoughts = (m[1] || "").trim();
-    const cleanedText = text
-      .replace(
-        /<redacted_thinking>\s*[\s\S]*?\s*<\/redacted_thinking>\s*/i,
-        "",
-      )
-      .trim();
-    return {
-      thoughts: thoughts || undefined,
-      cleanedText: cleanedText || text,
-    };
-  };
-
   const { sessionId: routeSessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
 
@@ -478,6 +462,9 @@ export const ChatInterface: React.FC = () => {
           );
         }
 
+        const modelParts =
+          msg.role !== "user" ? getModelMessageParts(msg) : null;
+
         return (
           <div
             key={msg.id}
@@ -517,10 +504,17 @@ export const ChatInterface: React.FC = () => {
                 {msg.role === "user" ? (
                   msg.text
                 ) : (
-                  <MarkdownRenderer
-                    content={msg.text}
-                    className={msg.isError ? "text-red-800 prose-red" : ""}
-                  />
+                  <>
+                    <MarkdownRenderer
+                      content={modelParts?.displayText ?? ""}
+                      className={msg.isError ? "text-red-800 prose-red" : ""}
+                    />
+                    {!msg.isError && (
+                      <ModelThoughtsCollapsible
+                        thoughtsText={modelParts?.thoughtsText}
+                      />
+                    )}
+                  </>
                 )}
               </div>
               <span
@@ -915,7 +909,7 @@ export const ChatInterface: React.FC = () => {
       // Check if response is empty and mark as error
       const isEmptyResponse =
         !fullResponseText || fullResponseText.trim().length === 0;
-      const parsed = extractThinkBlock(fullResponseText);
+      const parsed = extractThinkBlockFromModelText(fullResponseText);
       const normalizedText = parsed.cleanedText;
       const normalizedThoughts =
         (finalThoughts && finalThoughts.trim()) || parsed.thoughts;
