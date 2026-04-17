@@ -105,6 +105,9 @@ export const TranslatorInterface: React.FC = () => {
             text: result.text,
             timestamp: timestamp + 1,
             usage: result.usage,
+            ...(result.thoughts?.trim() && {
+              thoughts: result.thoughts.trim(),
+            }),
           });
         }
       }

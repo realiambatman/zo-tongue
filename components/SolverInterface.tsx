@@ -120,6 +120,9 @@ export const SolverInterface: React.FC = () => {
             text: response.text,
             timestamp: timestamp + 1,
             usage: response.usage,
+            ...(response.thoughts?.trim() && {
+              thoughts: response.thoughts.trim(),
+            }),
           });
         }
       } catch (saveError) {

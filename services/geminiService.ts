@@ -386,7 +386,7 @@ export const translateText = async (
   text: string,
   sourceLang: SupportedLanguage,
   targetLang: SupportedLanguage
-): Promise<{ text: string; usage?: any }> => {
+): Promise<{ text: string; usage?: any; thoughts?: string }> => {
   try {
     return await apiClient.translateText(text, sourceLang, targetLang);
   } catch (error) {
@@ -401,7 +401,7 @@ export const translateText = async (
 export const generateStudyMaterial = async (
   text: string,
   targetLang: SupportedLanguage
-): Promise<{ data: StudyData; usage?: any }> => {
+): Promise<{ data: StudyData; usage?: any; thoughts?: string }> => {
   try {
     return await apiClient.generateStudyMaterial(text, targetLang);
   } catch (error) {
@@ -418,7 +418,7 @@ export const solveMultimodal = async (
   mimeType: string | null,
   question: string,
   outputLanguage: SupportedLanguage
-): Promise<{ text: string; usage?: any }> => {
+): Promise<{ text: string; usage?: any; thoughts?: string }> => {
   try {
     return await apiClient.solveMultimodal(
       imageBase64,

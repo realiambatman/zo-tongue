@@ -99,6 +99,9 @@ export const StudyInterface: React.FC = () => {
           text: formattedOutput,
           timestamp: timestamp + 1,
           usage: response.usage,
+          ...(response.thoughts?.trim() && {
+            thoughts: response.thoughts.trim(),
+          }),
         });
       }
     } catch (e) {

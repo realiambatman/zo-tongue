@@ -132,7 +132,7 @@ export const apiClient = {
     sourceLang: SupportedLanguage,
     targetLang: SupportedLanguage,
     signal?: AbortSignal
-  ): Promise<{ text: string; usage?: any }> {
+  ): Promise<{ text: string; usage?: any; thoughts?: string }> {
     const response = await fetch(`${API_BASE_URL}/translate`, {
       method: "POST",
       headers: {
@@ -171,7 +171,7 @@ export const apiClient = {
     text: string,
     targetLang: SupportedLanguage,
     signal?: AbortSignal
-  ): Promise<{ data: StudyData; usage?: any }> {
+  ): Promise<{ data: StudyData; usage?: any; thoughts?: string }> {
     const response = await fetch(`${API_BASE_URL}/study`, {
       method: "POST",
       headers: {
@@ -211,7 +211,7 @@ export const apiClient = {
     question: string,
     outputLanguage: SupportedLanguage,
     signal?: AbortSignal
-  ): Promise<{ text: string; usage?: any }> {
+  ): Promise<{ text: string; usage?: any; thoughts?: string }> {
     const response = await fetch(`${API_BASE_URL}/solve`, {
       method: "POST",
       headers: {
