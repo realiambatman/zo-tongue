@@ -82,8 +82,14 @@ export const AdminPanel: React.FC = () => {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportLanguage, setExportLanguage] = useState<string>("All");
-  const [exportFormat, setExportFormat] = useState<"messages" | "sft">(
-    "messages",
+  const [exportFormat, setExportFormat] = useState<
+    "messages" | "sft" | "translation_extract"
+  >("messages");
+  const translationPartnerLanguages = Object.values(SupportedLanguage).filter(
+    (lang) => lang !== SupportedLanguage.English,
+  );
+  const [translationDirection, setTranslationDirection] = useState<string>(
+    `${SupportedLanguage.English}->${SupportedLanguage.Paite}`,
   );
   /** YYYY-MM-DD; empty = no bound */
   const [exportDateFrom, setExportDateFrom] = useState("");
@@ -158,6 +164,31 @@ export const AdminPanel: React.FC = () => {
     return rest
       ? `Translate to ${to}: ${rest}`
       : `Translate to ${to}`;
+  };
+
+  const normalizeSupportedLanguage = (
+    raw: string,
+  ): SupportedLanguage | null => {
+    const cleaned = raw.trim().toLowerCase();
+    const match = Object.values(SupportedLanguage).find(
+      (lang) => lang.toLowerCase() === cleaned,
+    );
+    return match ?? null;
+  };
+
+  const parseTranslationPrompt = (
+    text: string,
+  ): { from: SupportedLanguage; to: SupportedLanguage; payload: string } | null => {
+    const m = text.trim().match(/^\[([^\]]+?)\s*->\s*([^\]]+?)\]\s*([\s\S]*)$/);
+    if (!m) return null;
+    const from = normalizeSupportedLanguage(m[1]);
+    const to = normalizeSupportedLanguage(m[2]);
+    if (!from || !to || from === to) return null;
+    return {
+      from,
+      to,
+      payload: m[3].trim(),
+    };
   };
 
   const isContextlessTranslatePrompt = (text: string): boolean => {
@@ -258,6 +289,9 @@ export const AdminPanel: React.FC = () => {
     let sessionsToExport = sessions.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
+    if (exportFormat === "translation_extract") {
+      sessionsToExport = sessions.filter((s) => s.type === SessionType.TRANSLATE);
+    }
     sessionsToExport = applyDateFilter(sessionsToExport);
     if (sessionsToExport.length === 0) {
       alert("No sessions match the current filters.");
@@ -292,6 +326,87 @@ export const AdminPanel: React.FC = () => {
         );
       }
     };
+
+    if (exportFormat === "translation_extract") {
+      const [selectedFromRaw, selectedToRaw] = translationDirection.split("->");
+      const selectedFrom = normalizeSupportedLanguage(selectedFromRaw || "");
+      const selectedTo = normalizeSupportedLanguage(selectedToRaw || "");
+      if (!selectedFrom || !selectedTo || selectedFrom === selectedTo) {
+        alert("Please choose a valid translation direction.");
+        return;
+      }
+
+      const translationLines: string[] = [];
+      sessionsToExport.forEach((session) => {
+        const msgs = session.messages;
+        for (let i = 0; i < msgs.length - 1; i++) {
+          const currentMsg = msgs[i];
+          const nextMsg = msgs[i + 1];
+          if (
+            currentMsg.role !== "user" ||
+            currentMsg.isSystem ||
+            currentMsg.isError ||
+            (nextMsg.role !== "model" && !nextMsg.isAdminReply) ||
+            nextMsg.isError
+          ) {
+            continue;
+          }
+
+          const parsed = parseTranslationPrompt(currentMsg.text || "");
+          if (!parsed || !parsed.payload) continue;
+          const assistantText = (getModelMessageParts(nextMsg).displayText || "").trim();
+          if (!assistantText) continue;
+          if (isErrorLikeLine(parsed.payload) || isErrorLikeLine(assistantText))
+            continue;
+          if (isRefusalLine(assistantText)) continue;
+
+          let sourceText = "";
+          let targetText = "";
+          if (parsed.from === selectedFrom && parsed.to === selectedTo) {
+            sourceText = parsed.payload;
+            targetText = assistantText;
+          } else if (parsed.from === selectedTo && parsed.to === selectedFrom) {
+            // Include reverse direction and normalize to selected direction.
+            sourceText = assistantText;
+            targetText = parsed.payload;
+          } else {
+            continue;
+          }
+
+          if (!sourceText || !targetText) continue;
+          if (selectedFrom === SupportedLanguage.English) {
+            translationLines.push(
+              JSON.stringify({ en: sourceText, pck: targetText }),
+            );
+          } else {
+            translationLines.push(
+              JSON.stringify({ pck: sourceText, en: targetText }),
+            );
+          }
+        }
+      });
+
+      const jsonlContent = translationLines.join("\n");
+      if (!jsonlContent.trim()) {
+        alert(
+          "No translation rows produced for this filter and language direction.",
+        );
+        return;
+      }
+      const blob = new Blob([jsonlContent], { type: "application/jsonlines" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const directionSlug = `${selectedFrom.toLowerCase()}_to_${selectedTo.toLowerCase()}`;
+      a.download = buildExportFilename(`translation_extract_${directionSlug}`);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      await finishExportRecord();
+      setShowExportModal(false);
+      return;
+    }
 
     if (exportFormat === "messages") {
       const linesWithoutThoughts: string[] = [];
@@ -1729,7 +1844,9 @@ export const AdminPanel: React.FC = () => {
               <select
                 value={exportFormat}
                 onChange={(e) =>
-                  setExportFormat(e.target.value as "messages" | "sft")
+                  setExportFormat(
+                    e.target.value as "messages" | "sft" | "translation_extract",
+                  )
                 }
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               >
@@ -1737,46 +1854,83 @@ export const AdminPanel: React.FC = () => {
                 <option value="sft">
                   SFT instruction / input / output (JSONL)
                 </option>
+                <option value="translation_extract">
+                  Translation extract only (en/pck JSONL)
+                </option>
               </select>
             </div>
 
-            <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={includeThoughtsInExport}
-                  onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
-                  className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                Include assistant reasoning in{" "}
-                <code>&lt;think&gt;...&lt;/think&gt;</code> blocks (if available)
-              </label>
-              <p className="mt-1 text-[11px] text-slate-500">
-                When enabled, adds a separate WITH THOUGHTS section where
-                assistant reasoning is embedded in{" "}
-                <code>&lt;think&gt;...&lt;/think&gt;</code> for both Chat
-                messages and SFT rows. The WITHOUT THOUGHTS section is the
-                visible answer only (no tags).
-              </p>
-            </div>
+            {exportFormat !== "translation_extract" && (
+              <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={includeThoughtsInExport}
+                    onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
+                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  Include assistant reasoning in{" "}
+                  <code>&lt;think&gt;...&lt;/think&gt;</code> blocks (if available)
+                </label>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  When enabled, adds a separate WITH THOUGHTS section where
+                  assistant reasoning is embedded in{" "}
+                  <code>&lt;think&gt;...&lt;/think&gt;</code> for both Chat
+                  messages and SFT rows. The WITHOUT THOUGHTS section is the
+                  visible answer only (no tags).
+                </p>
+              </div>
+            )}
 
-            <div className="mb-6">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-                Language filter
-              </label>
-              <select
-                value={exportLanguage}
-                onChange={(e) => setExportLanguage(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              >
-                <option value="All">All Languages</option>
-                {Object.values(SupportedLanguage).map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {exportFormat === "translation_extract" ? (
+              <div className="mb-6">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Translation direction (includes reverse pair automatically)
+                </label>
+                <select
+                  value={translationDirection}
+                  onChange={(e) => setTranslationDirection(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  {translationPartnerLanguages.flatMap((lang) => [
+                    <option
+                      key={`en-to-${lang}`}
+                      value={`${SupportedLanguage.English}->${lang}`}
+                    >
+                      {SupportedLanguage.English} to {lang}
+                    </option>,
+                    <option
+                      key={`${lang}-to-en`}
+                      value={`${lang}->${SupportedLanguage.English}`}
+                    >
+                      {lang} to {SupportedLanguage.English}
+                    </option>,
+                  ])}
+                </select>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Example: if you choose English to Paite, the export also reads
+                  Paite to English rows and reverses them to English to Paite.
+                </p>
+              </div>
+            ) : (
+              <div className="mb-6">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  Language filter
+                </label>
+                <select
+                  value={exportLanguage}
+                  onChange={(e) => setExportLanguage(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                >
+                  <option value="All">All Languages</option>
+                  {Object.values(SupportedLanguage).map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button
