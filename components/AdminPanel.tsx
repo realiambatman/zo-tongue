@@ -161,9 +161,7 @@ export const AdminPanel: React.FC = () => {
     }
     const to = m[2].trim();
     const rest = m[3].trim();
-    return rest
-      ? `Translate to ${to}: ${rest}`
-      : `Translate to ${to}`;
+    return rest ? `Translate to ${to}: ${rest}` : `Translate to ${to}`;
   };
 
   const normalizeSupportedLanguage = (
@@ -178,7 +176,11 @@ export const AdminPanel: React.FC = () => {
 
   const parseTranslationPrompt = (
     text: string,
-  ): { from: SupportedLanguage; to: SupportedLanguage; payload: string } | null => {
+  ): {
+    from: SupportedLanguage;
+    to: SupportedLanguage;
+    payload: string;
+  } | null => {
     const m = text.trim().match(/^\[([^\]]+?)\s*->\s*([^\]]+?)\]\s*([\s\S]*)$/);
     if (!m) return null;
     const from = normalizeSupportedLanguage(m[1]);
@@ -290,7 +292,9 @@ export const AdminPanel: React.FC = () => {
       (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
     if (exportFormat === "translation_extract") {
-      sessionsToExport = sessions.filter((s) => s.type === SessionType.TRANSLATE);
+      sessionsToExport = sessions.filter(
+        (s) => s.type === SessionType.TRANSLATE,
+      );
     }
     sessionsToExport = applyDateFilter(sessionsToExport);
     if (sessionsToExport.length === 0) {
@@ -299,15 +303,18 @@ export const AdminPanel: React.FC = () => {
     }
 
     const finishExportRecord = async () => {
-      const entry: Omit<AdminExportHistoryEntry, "at"> = {
+      const entryBase: Omit<AdminExportHistoryEntry, "at"> = {
         sessionCount: sessionsToExport.length,
         lang: exportLanguage,
         format: exportFormat,
         mode: exportMode,
         basis:
           exportMode === "sinceLastExact" ? "lastUpdated" : exportDateBasis,
-        fromDate: exportDateFrom || undefined,
-        toDate: exportDateTo || undefined,
+      };
+      const entry: Omit<AdminExportHistoryEntry, "at"> = {
+        ...entryBase,
+        ...(exportDateFrom ? { fromDate: exportDateFrom } : {}),
+        ...(exportDateTo ? { toDate: exportDateTo } : {}),
       };
       try {
         await appendAdminExportHistory(uid, entry);
@@ -354,7 +361,9 @@ export const AdminPanel: React.FC = () => {
 
           const parsed = parseTranslationPrompt(currentMsg.text || "");
           if (!parsed || !parsed.payload) continue;
-          const assistantText = (getModelMessageParts(nextMsg).displayText || "").trim();
+          const assistantText = (
+            getModelMessageParts(nextMsg).displayText || ""
+          ).trim();
           if (!assistantText) continue;
           if (isErrorLikeLine(parsed.payload) || isErrorLikeLine(assistantText))
             continue;
@@ -477,7 +486,10 @@ export const AdminPanel: React.FC = () => {
           }
 
           messagesWithoutThoughts.push({ role: "user", content: userText });
-          messagesWithoutThoughts.push({ role: "assistant", content: assistantText });
+          messagesWithoutThoughts.push({
+            role: "assistant",
+            content: assistantText,
+          });
 
           messagesWithThoughts.push({ role: "user", content: userText });
           const thoughtText = (assistantParts.thoughtsText || "").trim();
@@ -631,10 +643,15 @@ export const AdminPanel: React.FC = () => {
       }
 
       if (sftDataWithoutThoughts.length > 0) {
-        if (exportLanguage === "All" && session.language !== currentLanguageHeaderWithout) {
+        if (
+          exportLanguage === "All" &&
+          session.language !== currentLanguageHeaderWithout
+        ) {
           currentLanguageHeaderWithout = session.language;
           sftLinesWithoutThoughts.push(
-            JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
+            JSON.stringify({
+              comment: `=== Language: ${session.language} ===`,
+            }),
           );
         }
         sftLinesWithoutThoughts.push(
@@ -643,10 +660,15 @@ export const AdminPanel: React.FC = () => {
         sftDataWithoutThoughts.length = 0;
       }
       if (sftDataWithThoughts.length > 0 && hasThoughtRowsInSession) {
-        if (exportLanguage === "All" && session.language !== currentLanguageHeaderWith) {
+        if (
+          exportLanguage === "All" &&
+          session.language !== currentLanguageHeaderWith
+        ) {
           currentLanguageHeaderWith = session.language;
           sftLinesWithThoughts.push(
-            JSON.stringify({ comment: `=== Language: ${session.language} ===` }),
+            JSON.stringify({
+              comment: `=== Language: ${session.language} ===`,
+            }),
           );
         }
         sftLinesWithThoughts.push(
@@ -1692,7 +1714,9 @@ export const AdminPanel: React.FC = () => {
                           );
                           return;
                         }
-                        setExportDateFrom(nextLocalDayYmdFromIso(lastExportIso));
+                        setExportDateFrom(
+                          nextLocalDayYmdFromIso(lastExportIso),
+                        );
                       }}
                       className="text-xs font-semibold px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
                     >
@@ -1789,7 +1813,10 @@ export const AdminPanel: React.FC = () => {
                     Latest export:{" "}
                   </span>
                   {new Date(lastExportIso).toLocaleString()}
-                  <span className="text-slate-400"> (stored on your account)</span>
+                  <span className="text-slate-400">
+                    {" "}
+                    (stored on your account)
+                  </span>
                 </p>
               )}
               {exportHistoryPreview.length > 0 && (
@@ -1845,7 +1872,10 @@ export const AdminPanel: React.FC = () => {
                 value={exportFormat}
                 onChange={(e) =>
                   setExportFormat(
-                    e.target.value as "messages" | "sft" | "translation_extract",
+                    e.target.value as
+                      | "messages"
+                      | "sft"
+                      | "translation_extract",
                   )
                 }
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -1866,11 +1896,14 @@ export const AdminPanel: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={includeThoughtsInExport}
-                    onChange={(e) => setIncludeThoughtsInExport(e.target.checked)}
+                    onChange={(e) =>
+                      setIncludeThoughtsInExport(e.target.checked)
+                    }
                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
                   Include assistant reasoning in{" "}
-                  <code>&lt;think&gt;...&lt;/think&gt;</code> blocks (if available)
+                  <code>&lt;think&gt;...&lt;/think&gt;</code> blocks (if
+                  available)
                 </label>
                 <p className="mt-1 text-[11px] text-slate-500">
                   When enabled, adds a separate WITH THOUGHTS section where
