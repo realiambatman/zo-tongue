@@ -2050,9 +2050,10 @@ export const AdminPanel: React.FC = () => {
               </button>
               <button
                 onClick={downloadSFTData}
-                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                disabled={exportLoading}
+                className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
               >
-                Download JSONL
+                {exportLoading ? "Loading sessions…" : "Download JSONL"}
               </button>
             </div>
           </div>
