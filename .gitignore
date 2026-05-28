@@ -18,6 +18,9 @@ dist-ssr
 .env.*.local
 server/.env
 
+# Firestore security rules (deploy via Firebase console / CLI; keep local only)
+firestore.rules
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
