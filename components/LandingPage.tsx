@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { AppMode } from "../types";
 import { useAuth } from "../contexts/AuthContext";
+import { isPlatformAdminEmail } from "../constants";
 import { SignInModal } from "./SignInModal";
 // Removed useNavigate import as we use window.location for SSR-like feel
 
@@ -186,7 +187,7 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   // Helper to check if user is admin (matches AdminPanel logic)
-  const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
+  const isAdmin = isPlatformAdminEmail(user?.email ?? null);
   // Helper to check if user is a registered user (not anonymous)
   const isRegistered = user && !user.isAnonymous;
 

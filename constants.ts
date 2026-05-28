@@ -13,3 +13,13 @@ export const LANGUAGE_OPTIONS: SupportedLanguage[] = [
 ];
 
 export const MODEL_NAME = "gemini-3.1-pro-preview";
+
+/** Matches AdminPanel + Firestore rules (`@buildnbit.com` admins). */
+export const ADMIN_EMAIL_DOMAIN = "@buildnbit.com";
+
+export function isPlatformAdminEmail(
+  email: string | null | undefined,
+): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase().endsWith(ADMIN_EMAIL_DOMAIN);
+}

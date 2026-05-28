@@ -20,6 +20,7 @@ import {
   subscribeToMaintenanceMode,
   getMaintenanceMode,
 } from "./services/dbService";
+import { isPlatformAdminEmail } from "./constants";
 
 // Component to check maintenance mode
 const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
@@ -33,31 +34,22 @@ const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     let isMounted = true;
-
-    // Immediately check maintenance mode (fast async check)
-    const checkMaintenance = async () => {
-      try {
-        const isEnabled = await getMaintenanceMode();
-        if (isMounted) {
-          setIsMaintenanceMode(isEnabled);
-        }
-      } catch (error) {
-        console.error("Error checking maintenance mode:", error);
-        if (isMounted) {
-          setIsMaintenanceMode(false); // Default to not in maintenance on error
-        }
-      }
+    const apply = (isEnabled: boolean) => {
+      if (isMounted) setIsMaintenanceMode(isEnabled);
     };
 
-    // Check immediately (no delay)
-    checkMaintenance();
-
-    // Then subscribe for real-time updates
-    const unsubscribe = subscribeToMaintenanceMode((isEnabled) => {
-      if (isMounted) {
-        setIsMaintenanceMode(isEnabled);
-      }
+    // Real-time listener (primary path — updates all open tabs instantly)
+    const unsubscribe = subscribeToMaintenanceMode(apply, (error) => {
+      console.error("Maintenance listener failed:", error);
     });
+
+    // One-shot fetch so first paint is not blocked waiting only on snapshot cold start
+    getMaintenanceMode()
+      .then(apply)
+      .catch((error) => {
+        console.error("Error checking maintenance mode:", error);
+        apply(false);
+      });
 
     return () => {
       isMounted = false;
@@ -68,9 +60,8 @@ const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
   // Always allow access to admin panel (let AdminPanel handle its own auth)
   const isAdminRoute = location.pathname === "/admin";
 
-  // Check if user is admin (only after auth is loaded)
   const isAdmin =
-    !authLoading && (user?.email?.endsWith("@buildnbit.com") ?? false);
+    !authLoading && isPlatformAdminEmail(user?.email ?? null);
 
   // Always allow /admin route through - AdminPanel will handle its own authentication
   if (isAdminRoute) {

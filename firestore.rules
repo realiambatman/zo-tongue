@@ -12,10 +12,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Helper: Check if the user is an Admin
+    // Helper: Check if the user is an Admin (email on auth token, case-insensitive)
     function isAdmin() {
-      return isSignedIn() && 
-             request.auth.token.email.matches('.*@buildnbit[.]com');
+      return isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower().matches('.*@buildnbit\\.com$');
     }
 
     // Rules for Chat Sessions

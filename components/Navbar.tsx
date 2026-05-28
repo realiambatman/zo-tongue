@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { SignInModal } from "./SignInModal";
 import { useAuth } from "../contexts/AuthContext";
+import { isPlatformAdminEmail } from "../constants";
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -19,7 +20,7 @@ export const Navbar: React.FC = () => {
   const isLandingPage = location.pathname === "/";
 
   // Helper to check if user is admin (matches AdminPanel logic)
-  const isAdmin = user?.email?.endsWith("@buildnbit.com") ?? false;
+  const isAdmin = isPlatformAdminEmail(user?.email ?? null);
   // Helper to check if user is a registered user (not anonymous)
   const isRegistered = user && !user.isAnonymous;
 

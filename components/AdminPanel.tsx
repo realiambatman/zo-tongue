@@ -9,6 +9,7 @@ import {
   deleteMessageFromSession,
   subscribeToMaintenanceMode,
   setMaintenanceMode,
+  getMaintenanceMode,
   ChatSession,
   UserProfile,
   fetchAdminExportProfile,
@@ -16,6 +17,7 @@ import {
   type AdminExportHistoryEntry,
 } from "../services/dbService";
 import { ChatMessage, SessionType, SupportedLanguage } from "../types";
+import { isPlatformAdminEmail } from "../constants";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ModelThoughtsCollapsible } from "./ModelThoughtsCollapsible";
 import { getModelMessageParts } from "../utils/thinkBlock";
@@ -718,7 +720,7 @@ export const AdminPanel: React.FC = () => {
   // Only check after auth has finished loading to prevent false "Access Denied" flash
   const isAdmin = authLoading
     ? null
-    : (user?.email?.endsWith("@buildnbit.com") ?? false);
+    : isPlatformAdminEmail(user?.email ?? null);
 
   // Force re-render every 5 seconds to update "active" status
   useEffect(() => {
@@ -800,18 +802,27 @@ export const AdminPanel: React.FC = () => {
     };
   }, []);
 
+  // Maintenance doc is world-readable — subscribe immediately for live toggle + cross-tab sync
+  useEffect(() => {
+    const unsub = subscribeToMaintenanceMode(
+      (isEnabled) => setIsMaintenanceMode(isEnabled),
+      (error) => console.error("Admin maintenance listener:", error),
+    );
+    getMaintenanceMode()
+      .then((isEnabled) => setIsMaintenanceMode(isEnabled))
+      .catch((error) => console.error("Admin maintenance fetch:", error));
+    return unsub;
+  }, []);
+
   useEffect(() => {
     let unsubscribeSessions: () => void;
     let unsubscribeUsers: () => void;
-    let unsubscribeMaintenance: () => void;
 
-    // Only proceed if auth has finished loading and user is confirmed admin
     if (isAdmin === true) {
       unsubscribeSessions = subscribeToAllSessions((allSessions) => {
         setSessions(allSessions);
         setLoading(false);
 
-        // Update selected session if it exists (for live updates)
         if (selectedSession) {
           const updated = allSessions.find((s) => s.id === selectedSession.id);
           if (updated) setSelectedSession(updated);
@@ -821,22 +832,15 @@ export const AdminPanel: React.FC = () => {
       unsubscribeUsers = subscribeToAllUsers((allUsers) => {
         setUsers(allUsers);
       });
-
-      unsubscribeMaintenance = subscribeToMaintenanceMode((isEnabled) => {
-        setIsMaintenanceMode(isEnabled);
-      });
     } else if (isAdmin === false) {
-      // Auth finished but user is not admin
       setLoading(false);
     }
-    // If isAdmin is null, we're still loading, so don't do anything
 
     return () => {
       if (unsubscribeSessions) unsubscribeSessions();
       if (unsubscribeUsers) unsubscribeUsers();
-      if (unsubscribeMaintenance) unsubscribeMaintenance();
     };
-  }, [isAdmin, selectedSession?.id]); // Re-subscribe if needed, but mainly just handle updates
+  }, [isAdmin, selectedSession?.id]);
 
   // Scroll logic: Chat -> Bottom, Others -> Top
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1092,14 +1096,25 @@ export const AdminPanel: React.FC = () => {
                 Maintenance
               </span>
               <button
+                type="button"
+                disabled={!user}
                 onClick={async () => {
                   const newValue = !isMaintenanceMode;
+                  const previous = isMaintenanceMode;
+                  setIsMaintenanceMode(newValue);
                   try {
-                    await setMaintenanceMode(newValue, user?.email || "admin");
-                    setIsMaintenanceMode(newValue);
+                    await setMaintenanceMode(
+                      newValue,
+                      user?.email || user?.uid || "admin",
+                    );
                   } catch (error) {
+                    setIsMaintenanceMode(previous);
                     console.error("Failed to toggle maintenance mode:", error);
-                    alert("Failed to toggle maintenance mode");
+                    const msg =
+                      error instanceof Error ? error.message : String(error);
+                    alert(
+                      `Failed to toggle maintenance mode. Check that you are signed in with a @buildnbit.com account and that Firestore rules are deployed.\n\n${msg}`,
+                    );
                   }
                 }}
                 className={`relative w-12 h-6 rounded-full transition-all duration-300 ${

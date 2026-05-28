@@ -540,7 +540,13 @@ const MAINTENANCE_DOC_ID = "site_maintenance";
 export interface MaintenanceSettings {
   isEnabled: boolean;
   lastUpdated: number;
-  updatedBy?: string;
+  updatedBy?: string | null;
+}
+
+function parseMaintenanceEnabled(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const row = data as Partial<MaintenanceSettings>;
+  return row.isEnabled === true;
 }
 
 /**
@@ -552,32 +558,41 @@ export const getMaintenanceMode = async (): Promise<boolean> => {
     const maintenanceDoc = await getDoc(maintenanceRef);
 
     if (!maintenanceDoc.exists()) {
-      return false; // Default to not in maintenance
+      return false;
     }
 
-    const data = maintenanceDoc.data() as MaintenanceSettings;
-    return data.isEnabled || false;
+    return parseMaintenanceEnabled(maintenanceDoc.data());
   } catch (error) {
     console.error("Error getting maintenance mode:", error);
-    return false; // Default to not in maintenance on error
+    throw error;
   }
 };
 
 /**
- * Subscribe to maintenance mode changes
+ * Subscribe to maintenance mode changes (real-time for all clients).
  */
 export const subscribeToMaintenanceMode = (
-  callback: (isEnabled: boolean) => void
+  callback: (isEnabled: boolean) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe => {
   const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
-  return onSnapshot(maintenanceRef, (doc) => {
-    if (doc.exists()) {
-      const data = doc.data() as MaintenanceSettings;
-      callback(data.isEnabled || false);
-    } else {
+  return onSnapshot(
+    maintenanceRef,
+    (snap) => {
+      if (snap.exists()) {
+        callback(parseMaintenanceEnabled(snap.data()));
+      } else {
+        callback(false);
+      }
+    },
+    (err) => {
+      const error =
+        err instanceof Error ? err : new Error(String(err ?? "unknown"));
+      console.error("Maintenance mode subscription error:", error);
+      onError?.(error);
       callback(false);
-    }
-  });
+    },
+  );
 };
 
 /**
@@ -585,21 +600,16 @@ export const subscribeToMaintenanceMode = (
  */
 export const setMaintenanceMode = async (
   isEnabled: boolean,
-  updatedBy?: string
+  updatedBy?: string,
 ): Promise<void> => {
-  try {
-    const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
-    await setDoc(
-      maintenanceRef,
-      {
-        isEnabled,
-        lastUpdated: Date.now(),
-        updatedBy: updatedBy || null,
-      } as MaintenanceSettings,
-      { merge: true }
-    );
-  } catch (error) {
-    console.error("Error setting maintenance mode:", error);
-    throw error;
-  }
+  const maintenanceRef = doc(db, "settings", MAINTENANCE_DOC_ID);
+  await setDoc(
+    maintenanceRef,
+    {
+      isEnabled: Boolean(isEnabled),
+      lastUpdated: Date.now(),
+      updatedBy: updatedBy ?? null,
+    } satisfies MaintenanceSettings,
+    { merge: true },
+  );
 };
