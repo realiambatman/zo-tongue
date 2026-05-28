@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  subscribeToAllSessions,
+  subscribeToRecentSessions,
   subscribeToAllUsers,
   addMessageToSession,
   toggleAiPause,
@@ -10,6 +10,9 @@ import {
   subscribeToMaintenanceMode,
   setMaintenanceMode,
   getMaintenanceMode,
+  startMaintenanceModePolling,
+  fetchSessionsForExport,
+  ADMIN_SESSIONS_LIST_LIMIT,
   ChatSession,
   UserProfile,
   fetchAdminExportProfile,
@@ -82,6 +85,10 @@ export const AdminPanel: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [firestoreQuotaWarning, setFirestoreQuotaWarning] = useState<
+    string | null
+  >(null);
+  const [exportLoading, setExportLoading] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportLanguage, setExportLanguage] = useState<string>("All");
   const [exportFormat, setExportFormat] = useState<
@@ -290,7 +297,19 @@ export const AdminPanel: React.FC = () => {
       alert("You must be signed in to record export history.");
       return;
     }
-    let sessionsToExport = sessions.filter(
+    setExportLoading(true);
+    let exportPool: ChatSession[];
+    try {
+      exportPool = await fetchSessionsForExport(2000);
+    } catch (error) {
+      setExportLoading(false);
+      const msg = error instanceof Error ? error.message : String(error);
+      alert(`Could not load sessions for export: ${msg}`);
+      return;
+    }
+    setExportLoading(false);
+
+    let sessionsToExport = exportPool.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
     if (exportFormat === "translation_extract") {
@@ -802,16 +821,44 @@ export const AdminPanel: React.FC = () => {
     };
   }, []);
 
-  // Maintenance doc is world-readable — subscribe immediately for live toggle + cross-tab sync
+  const noteFirestoreQuota = (error: unknown) => {
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code: string }).code)
+        : "";
+    const msg = error instanceof Error ? error.message : String(error ?? "");
+    if (code === "resource-exhausted" || msg.includes("Quota exceeded")) {
+      setFirestoreQuotaWarning(
+        "Firestore quota exceeded. Live updates are limited — try turning maintenance off, wait for quota reset, or upgrade your Firebase plan.",
+      );
+    }
+  };
+
   useEffect(() => {
+    let stopPoll: (() => void) | null = null;
     const unsub = subscribeToMaintenanceMode(
       (isEnabled) => setIsMaintenanceMode(isEnabled),
-      (error) => console.error("Admin maintenance listener:", error),
+      (error) => {
+        console.error("Admin maintenance listener:", error);
+        noteFirestoreQuota(error);
+        stopPoll = startMaintenanceModePolling((isEnabled) =>
+          setIsMaintenanceMode(isEnabled),
+        );
+      },
     );
     getMaintenanceMode()
       .then((isEnabled) => setIsMaintenanceMode(isEnabled))
-      .catch((error) => console.error("Admin maintenance fetch:", error));
-    return unsub;
+      .catch((error) => {
+        console.error("Admin maintenance fetch:", error);
+        if (error instanceof Error) noteFirestoreQuota(error);
+        stopPoll = startMaintenanceModePolling((isEnabled) =>
+          setIsMaintenanceMode(isEnabled),
+        );
+      });
+    return () => {
+      unsub();
+      stopPoll?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -819,15 +866,23 @@ export const AdminPanel: React.FC = () => {
     let unsubscribeUsers: () => void;
 
     if (isAdmin === true) {
-      unsubscribeSessions = subscribeToAllSessions((allSessions) => {
-        setSessions(allSessions);
-        setLoading(false);
+      unsubscribeSessions = subscribeToRecentSessions(
+        (recentSessions) => {
+          setSessions(recentSessions);
+          setLoading(false);
 
-        if (selectedSession) {
-          const updated = allSessions.find((s) => s.id === selectedSession.id);
-          if (updated) setSelectedSession(updated);
-        }
-      });
+          if (selectedSession) {
+            const updated = recentSessions.find(
+              (s) => s.id === selectedSession.id,
+            );
+            if (updated) setSelectedSession(updated);
+          }
+        },
+        (error) => {
+          setLoading(false);
+          noteFirestoreQuota(error);
+        },
+      );
 
       unsubscribeUsers = subscribeToAllUsers((allUsers) => {
         setUsers(allUsers);
@@ -1075,6 +1130,11 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="fixed inset-0 bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
+        {firestoreQuotaWarning && (
+          <div className="mt-4 shrink-0 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            {firestoreQuotaWarning}
+          </div>
+        )}
         {/* Header - Hidden on mobile when viewing a session */}
         <div
           className={`py-5 lg:py-8 flex justify-between items-center shrink-0 ${
@@ -1086,7 +1146,8 @@ export const AdminPanel: React.FC = () => {
               System Overview
             </h1>
             <p className="text-ink-muted font-mono text-[10px] sm:text-xs uppercase tracking-widest">
-              Admin Dashboard • {sessions.length} Total Sessions
+              Admin Dashboard • {sessions.length} recent sessions (max{" "}
+              {ADMIN_SESSIONS_LIST_LIMIT})
             </p>
           </div>
           <div className="flex items-center gap-3">

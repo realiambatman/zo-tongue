@@ -12,6 +12,10 @@ import {
   deleteDoc,
   onSnapshot,
   Unsubscribe,
+  limit,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { ChatMessage, SupportedLanguage, SessionType } from "../types";
@@ -318,16 +322,73 @@ export const getSessionById = async (
   }
 };
 
-export const subscribeToAllSessions = (
-  callback: (sessions: ChatSession[]) => void
+/** Cap realtime admin reads — full-collection listeners exhaust Firestore quota. */
+export const ADMIN_SESSIONS_LIST_LIMIT = 120;
+
+const mapSessionDocs = (docs: QueryDocumentSnapshot<DocumentData>[]) =>
+  docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ChatSession));
+
+export const subscribeToRecentSessions = (
+  callback: (sessions: ChatSession[]) => void,
+  onError?: (error: Error) => void,
+  maxSessions: number = ADMIN_SESSIONS_LIST_LIMIT,
 ): Unsubscribe => {
-  const q = query(collection(db, "chats"), orderBy("lastUpdated", "desc"));
-  return onSnapshot(q, (querySnapshot) => {
-    const sessions = querySnapshot.docs.map(
-      (doc) => ({ id: doc.id, ...doc.data() } as ChatSession)
-    );
-    callback(sessions);
-  });
+  const q = query(
+    collection(db, "chats"),
+    orderBy("lastUpdated", "desc"),
+    limit(maxSessions),
+  );
+  return onSnapshot(
+    q,
+    (querySnapshot) => {
+      callback(mapSessionDocs(querySnapshot.docs));
+    },
+    (err) => {
+      const error =
+        err instanceof Error ? err : new Error(String(err ?? "unknown"));
+      console.error("Recent sessions subscription error:", error);
+      onError?.(error);
+    },
+  );
+};
+
+/** @deprecated Prefer subscribeToRecentSessions — loads entire chats collection. */
+export const subscribeToAllSessions = (
+  callback: (sessions: ChatSession[]) => void,
+): Unsubscribe => subscribeToRecentSessions(callback);
+
+/**
+ * Paginated fetch for admin export (on demand — not a live listener).
+ */
+export const fetchSessionsForExport = async (
+  maxDocs = 2000,
+  pageSize = 100,
+): Promise<ChatSession[]> => {
+  const sessions: ChatSession[] = [];
+  let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
+
+  while (sessions.length < maxDocs) {
+    const batchLimit = Math.min(pageSize, maxDocs - sessions.length);
+    const q = cursor
+      ? query(
+          collection(db, "chats"),
+          orderBy("lastUpdated", "desc"),
+          startAfter(cursor),
+          limit(batchLimit),
+        )
+      : query(
+          collection(db, "chats"),
+          orderBy("lastUpdated", "desc"),
+          limit(batchLimit),
+        );
+    const snap = await getDocs(q);
+    if (snap.empty) break;
+    sessions.push(...mapSessionDocs(snap.docs));
+    cursor = snap.docs[snap.docs.length - 1];
+    if (snap.docs.length < pageSize) break;
+  }
+
+  return sessions;
 };
 
 export const subscribeToSession = (
@@ -590,9 +651,32 @@ export const subscribeToMaintenanceMode = (
         err instanceof Error ? err : new Error(String(err ?? "unknown"));
       console.error("Maintenance mode subscription error:", error);
       onError?.(error);
-      callback(false);
+      // Do not default to false — quota/errors would hide maintenance from users.
     },
   );
+};
+
+const MAINTENANCE_POLL_MS = 12_000;
+
+/** Fallback when realtime listener fails (e.g. resource-exhausted). */
+export const startMaintenanceModePolling = (
+  callback: (isEnabled: boolean) => void,
+): (() => void) => {
+  let cancelled = false;
+  const tick = async () => {
+    if (cancelled) return;
+    try {
+      callback(await getMaintenanceMode());
+    } catch (error) {
+      console.error("Maintenance poll failed:", error);
+    }
+  };
+  void tick();
+  const id = setInterval(() => void tick(), MAINTENANCE_POLL_MS);
+  return () => {
+    cancelled = true;
+    clearInterval(id);
+  };
 };
 
 /**
