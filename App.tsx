@@ -19,7 +19,6 @@ import { ServiceUnavailable } from "./components/ServiceUnavailable";
 import {
   subscribeToMaintenanceMode,
   getMaintenanceMode,
-  startMaintenanceModePolling,
 } from "./services/dbService";
 import { isPlatformAdminEmail } from "./constants";
 
@@ -34,34 +33,29 @@ const MaintenanceGuard: React.FC<{ children: React.ReactNode }> = ({
   const location = useLocation();
 
   useEffect(() => {
-    if (location.pathname === "/admin") {
-      return;
-    }
-
     let isMounted = true;
-    let stopPoll: (() => void) | null = null;
     const apply = (isEnabled: boolean) => {
       if (isMounted) setIsMaintenanceMode(isEnabled);
     };
 
+    // Real-time listener (primary path — updates all open tabs instantly)
     const unsubscribe = subscribeToMaintenanceMode(apply, (error) => {
       console.error("Maintenance listener failed:", error);
-      stopPoll = startMaintenanceModePolling(apply);
     });
 
+    // One-shot fetch so first paint is not blocked waiting only on snapshot cold start
     getMaintenanceMode()
       .then(apply)
       .catch((error) => {
         console.error("Error checking maintenance mode:", error);
-        if (!stopPoll) stopPoll = startMaintenanceModePolling(apply);
+        apply(false);
       });
 
     return () => {
       isMounted = false;
       unsubscribe();
-      stopPoll?.();
     };
-  }, [location.pathname]);
+  }, []);
 
   // Always allow access to admin panel (let AdminPanel handle its own auth)
   const isAdminRoute = location.pathname === "/admin";

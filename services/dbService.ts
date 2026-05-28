@@ -5,6 +5,8 @@ import {
   where,
   getDocs,
   orderBy,
+  limit,
+  startAfter,
   Timestamp,
   doc,
   setDoc,
@@ -12,10 +14,7 @@ import {
   deleteDoc,
   onSnapshot,
   Unsubscribe,
-  limit,
-  startAfter,
-  QueryDocumentSnapshot,
-  DocumentData,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { ChatMessage, SupportedLanguage, SessionType } from "../types";
@@ -108,6 +107,93 @@ export const subscribeToAllUsers = (
     callback(users);
   });
 };
+
+/** Admin sidebar: small pages instead of loading every chat/user at once. */
+export const ADMIN_PAGE_SIZE = 20;
+
+export type AdminListPage<T> = {
+  items: T[];
+  lastDoc: QueryDocumentSnapshot | null;
+  hasMore: boolean;
+};
+
+/** List row only — omits messages to avoid holding huge arrays in React state. */
+export function mapSessionListDoc(
+  snap: QueryDocumentSnapshot
+): ChatSession {
+  const data = snap.data() as Record<string, unknown>;
+  return {
+    id: snap.id,
+    userId: data.userId as string,
+    userEmail: (data.userEmail as string | null | undefined) ?? null,
+    title: (data.title as string) || "New Chat",
+    language: data.language as SupportedLanguage,
+    startTime: data.startTime as number,
+    lastUpdated: data.lastUpdated as number,
+    messages: [],
+    isAnonymous: Boolean(data.isAnonymous),
+    isAiPaused: data.isAiPaused as boolean | undefined,
+    type: data.type as SessionType | undefined,
+    ipAddress: data.ipAddress as string | null | undefined,
+  };
+}
+
+export async function fetchAdminSessionsPage(
+  cursor: QueryDocumentSnapshot | null,
+  options?: {
+    pageSize?: number;
+    userEmail?: string;
+    guestsOnly?: boolean;
+  }
+): Promise<AdminListPage<ChatSession>> {
+  const pageSize = options?.pageSize ?? ADMIN_PAGE_SIZE;
+  const constraints: Parameters<typeof query>[1][] = [];
+
+  if (options?.userEmail) {
+    constraints.push(where("userEmail", "==", options.userEmail));
+  } else if (options?.guestsOnly) {
+    constraints.push(where("userEmail", "==", null));
+  }
+
+  constraints.push(orderBy("lastUpdated", "desc"));
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(pageSize));
+
+  const snap = await getDocs(query(collection(db, "chats"), ...constraints));
+  const items = snap.docs.map(mapSessionListDoc);
+  const lastDoc =
+    snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+
+  return {
+    items,
+    lastDoc,
+    hasMore: snap.docs.length === pageSize,
+  };
+}
+
+export async function fetchAdminUsersPage(
+  cursor: QueryDocumentSnapshot | null,
+  pageSize: number = ADMIN_PAGE_SIZE
+): Promise<AdminListPage<UserProfile>> {
+  const constraints: Parameters<typeof query>[1][] = [
+    orderBy("lastLogin", "desc"),
+  ];
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(pageSize));
+
+  const snap = await getDocs(query(collection(db, "users"), ...constraints));
+  const items = snap.docs.map(
+    (d) => ({ uid: d.id, ...d.data() } as UserProfile)
+  );
+  const lastDoc =
+    snap.docs.length > 0 ? snap.docs[snap.docs.length - 1] : null;
+
+  return {
+    items,
+    lastDoc,
+    hasMore: snap.docs.length === pageSize,
+  };
+}
 
 export const saveChatSession = async (session: ChatSession) => {
   try {
@@ -322,73 +408,16 @@ export const getSessionById = async (
   }
 };
 
-/** Cap realtime admin reads — full-collection listeners exhaust Firestore quota. */
-export const ADMIN_SESSIONS_LIST_LIMIT = 120;
-
-const mapSessionDocs = (docs: QueryDocumentSnapshot<DocumentData>[]) =>
-  docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ChatSession));
-
-export const subscribeToRecentSessions = (
-  callback: (sessions: ChatSession[]) => void,
-  onError?: (error: Error) => void,
-  maxSessions: number = ADMIN_SESSIONS_LIST_LIMIT,
-): Unsubscribe => {
-  const q = query(
-    collection(db, "chats"),
-    orderBy("lastUpdated", "desc"),
-    limit(maxSessions),
-  );
-  return onSnapshot(
-    q,
-    (querySnapshot) => {
-      callback(mapSessionDocs(querySnapshot.docs));
-    },
-    (err) => {
-      const error =
-        err instanceof Error ? err : new Error(String(err ?? "unknown"));
-      console.error("Recent sessions subscription error:", error);
-      onError?.(error);
-    },
-  );
-};
-
-/** @deprecated Prefer subscribeToRecentSessions — loads entire chats collection. */
 export const subscribeToAllSessions = (
-  callback: (sessions: ChatSession[]) => void,
-): Unsubscribe => subscribeToRecentSessions(callback);
-
-/**
- * Paginated fetch for admin export (on demand — not a live listener).
- */
-export const fetchSessionsForExport = async (
-  maxDocs = 2000,
-  pageSize = 100,
-): Promise<ChatSession[]> => {
-  const sessions: ChatSession[] = [];
-  let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
-
-  while (sessions.length < maxDocs) {
-    const batchLimit = Math.min(pageSize, maxDocs - sessions.length);
-    const q = cursor
-      ? query(
-          collection(db, "chats"),
-          orderBy("lastUpdated", "desc"),
-          startAfter(cursor),
-          limit(batchLimit),
-        )
-      : query(
-          collection(db, "chats"),
-          orderBy("lastUpdated", "desc"),
-          limit(batchLimit),
-        );
-    const snap = await getDocs(q);
-    if (snap.empty) break;
-    sessions.push(...mapSessionDocs(snap.docs));
-    cursor = snap.docs[snap.docs.length - 1];
-    if (snap.docs.length < pageSize) break;
-  }
-
-  return sessions;
+  callback: (sessions: ChatSession[]) => void
+): Unsubscribe => {
+  const q = query(collection(db, "chats"), orderBy("lastUpdated", "desc"));
+  return onSnapshot(q, (querySnapshot) => {
+    const sessions = querySnapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() } as ChatSession)
+    );
+    callback(sessions);
+  });
 };
 
 export const subscribeToSession = (
@@ -651,32 +680,9 @@ export const subscribeToMaintenanceMode = (
         err instanceof Error ? err : new Error(String(err ?? "unknown"));
       console.error("Maintenance mode subscription error:", error);
       onError?.(error);
-      // Do not default to false — quota/errors would hide maintenance from users.
+      callback(false);
     },
   );
-};
-
-const MAINTENANCE_POLL_MS = 12_000;
-
-/** Fallback when realtime listener fails (e.g. resource-exhausted). */
-export const startMaintenanceModePolling = (
-  callback: (isEnabled: boolean) => void,
-): (() => void) => {
-  let cancelled = false;
-  const tick = async () => {
-    if (cancelled) return;
-    try {
-      callback(await getMaintenanceMode());
-    } catch (error) {
-      console.error("Maintenance poll failed:", error);
-    }
-  };
-  void tick();
-  const id = setInterval(() => void tick(), MAINTENANCE_POLL_MS);
-  return () => {
-    cancelled = true;
-    clearInterval(id);
-  };
 };
 
 /**

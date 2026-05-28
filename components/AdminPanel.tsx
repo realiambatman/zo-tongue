@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  subscribeToRecentSessions,
-  subscribeToAllUsers,
+  subscribeToSession,
+  fetchAdminSessionsPage,
+  fetchAdminUsersPage,
+  getAllSessions,
+  ADMIN_PAGE_SIZE,
   addMessageToSession,
   toggleAiPause,
   deleteChatSession,
@@ -10,15 +13,13 @@ import {
   subscribeToMaintenanceMode,
   setMaintenanceMode,
   getMaintenanceMode,
-  startMaintenanceModePolling,
-  fetchSessionsForExport,
-  ADMIN_SESSIONS_LIST_LIMIT,
   ChatSession,
   UserProfile,
   fetchAdminExportProfile,
   appendAdminExportHistory,
   type AdminExportHistoryEntry,
 } from "../services/dbService";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 import { ChatMessage, SessionType, SupportedLanguage } from "../types";
 import { isPlatformAdminEmail } from "../constants";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -70,12 +71,25 @@ export const AdminPanel: React.FC = () => {
   const onBack = () => navigate("/");
 
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sidebarSessions, setSidebarSessions] = useState<ChatSession[]>([]);
+  const [sidebarCursor, setSidebarCursor] =
+    useState<QueryDocumentSnapshot | null>(null);
+  const [sidebarHasMore, setSidebarHasMore] = useState(true);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [usersCursor, setUsersCursor] = useState<QueryDocumentSnapshot | null>(
+    null,
+  );
+  const [usersHasMore, setUsersHasMore] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null,
+  );
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(
     null,
   );
+  const [exportLoading, setExportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"users" | "guests" | "active">(
     "users",
   );
@@ -85,10 +99,6 @@ export const AdminPanel: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [tick, setTick] = useState(0); // To force re-render for active tab
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
-  const [firestoreQuotaWarning, setFirestoreQuotaWarning] = useState<
-    string | null
-  >(null);
-  const [exportLoading, setExportLoading] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportLanguage, setExportLanguage] = useState<string>("All");
   const [exportFormat, setExportFormat] = useState<
@@ -298,22 +308,22 @@ export const AdminPanel: React.FC = () => {
       return;
     }
     setExportLoading(true);
+    try {
     let exportPool: ChatSession[];
     try {
-      exportPool = await fetchSessionsForExport(2000);
+      exportPool = await getAllSessions();
     } catch (error) {
-      setExportLoading(false);
-      const msg = error instanceof Error ? error.message : String(error);
-      alert(`Could not load sessions for export: ${msg}`);
+      console.error("Export load failed:", error);
+      alert(
+        "Could not load sessions for export. Firestore quota may be exceeded — try again later or narrow filters.",
+      );
       return;
     }
-    setExportLoading(false);
-
     let sessionsToExport = exportPool.filter(
       (s) => exportLanguage === "All" || s.language === exportLanguage,
     );
     if (exportFormat === "translation_extract") {
-      sessionsToExport = sessions.filter(
+      sessionsToExport = sessionsToExport.filter(
         (s) => s.type === SessionType.TRANSLATE,
       );
     }
@@ -733,6 +743,9 @@ export const AdminPanel: React.FC = () => {
     URL.revokeObjectURL(url);
     await finishExportRecord();
     setShowExportModal(false);
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   // Admin check: Allow access if email ends with @buildnbit.com
@@ -749,62 +762,65 @@ export const AdminPanel: React.FC = () => {
     }
   }, [activeTab]);
 
-  // Derived data
-  const guestSessions = sessions.filter((s) => !s.userEmail);
-  const userSessions = sessions.filter((s) => s.userEmail);
-  const activeSessions = sessions
-    .filter(
-      (s) => Date.now() - s.lastUpdated < 30000, // 30 seconds activity window
-    )
+  const activeSessions = sidebarSessions
+    .filter((s) => Date.now() - s.lastUpdated < 30000)
     .sort((a, b) => b.lastUpdated - a.lastUpdated);
 
-  // Group user sessions by email
-  const sessionsByEmail = userSessions.reduce(
-    (acc, session) => {
-      const email = session.userEmail!;
-      if (!acc[email]) {
-        acc[email] = [];
+  const sidebarScrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const listLoadLockRef = useRef(false);
+
+  const loadSidebarPage = async (append: boolean) => {
+    if (listLoadLockRef.current) return;
+    if (append && !sidebarHasMore) return;
+    listLoadLockRef.current = true;
+    setSidebarLoading(true);
+    try {
+      const opts =
+        activeTab === "guests"
+          ? { guestsOnly: true }
+          : selectedUserEmail
+            ? { userEmail: selectedUserEmail }
+            : undefined;
+      const page = await fetchAdminSessionsPage(
+        append ? sidebarCursor : null,
+        opts,
+      );
+      let items = page.items;
+      if (activeTab === "guests") {
+        items = items.filter((s) => !s.userEmail);
       }
-      acc[email].push(session);
-      return acc;
-    },
-    {} as Record<string, ChatSession[]>,
-  );
-
-  // Create unified user list
-  const allDisplayUsers = users.map((user) => {
-    const userSessions = sessionsByEmail[user.email] || [];
-    return {
-      email: user.email,
-      displayName: user.displayName,
-      sessions: userSessions.sort((a, b) => b.lastUpdated - a.lastUpdated),
-      lastActive: Math.max(
-        user.lastLogin,
-        ...(userSessions.map((s) => s.lastUpdated) || [0]),
-      ),
-    };
-  });
-
-  // Add users who have sessions but NO user profile (legacy/edge case)
-  const registeredEmails = new Set(users.map((u) => u.email));
-  Object.keys(sessionsByEmail).forEach((email) => {
-    if (!registeredEmails.has(email)) {
-      allDisplayUsers.push({
-        email,
-        displayName: null,
-        sessions: sessionsByEmail[email].sort(
-          (a, b) => b.lastUpdated - a.lastUpdated,
-        ),
-        lastActive: Math.max(
-          ...sessionsByEmail[email].map((s) => s.lastUpdated),
-        ),
-      });
+      if (activeTab === "active") {
+        items = items.filter((s) => Date.now() - s.lastUpdated < 30000);
+      }
+      setSidebarSessions((prev) => (append ? [...prev, ...items] : items));
+      setSidebarCursor(page.lastDoc);
+      setSidebarHasMore(page.hasMore);
+    } catch (error) {
+      console.error("Admin session page load failed:", error);
+    } finally {
+      setSidebarLoading(false);
+      listLoadLockRef.current = false;
     }
-  });
+  };
 
-  const uniqueUsers = allDisplayUsers.sort(
-    (a, b) => b.lastActive - a.lastActive,
-  );
+  const loadUsersPage = async (append: boolean) => {
+    if (listLoadLockRef.current) return;
+    if (append && !usersHasMore) return;
+    listLoadLockRef.current = true;
+    setUsersLoading(true);
+    try {
+      const page = await fetchAdminUsersPage(append ? usersCursor : null);
+      setUsers((prev) => (append ? [...prev, ...page.items] : page.items));
+      setUsersCursor(page.lastDoc);
+      setUsersHasMore(page.hasMore);
+    } catch (error) {
+      console.error("Admin users page load failed:", error);
+    } finally {
+      setUsersLoading(false);
+      listLoadLockRef.current = false;
+    }
+  };
 
   // Prevent body scroll on mount (mobile viewport fix)
   useEffect(() => {
@@ -821,81 +837,83 @@ export const AdminPanel: React.FC = () => {
     };
   }, []);
 
-  const noteFirestoreQuota = (error: unknown) => {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String((error as { code: string }).code)
-        : "";
-    const msg = error instanceof Error ? error.message : String(error ?? "");
-    if (code === "resource-exhausted" || msg.includes("Quota exceeded")) {
-      setFirestoreQuotaWarning(
-        "Firestore quota exceeded. Live updates are limited — try turning maintenance off, wait for quota reset, or upgrade your Firebase plan.",
-      );
-    }
-  };
-
+  // Maintenance doc is world-readable — subscribe immediately for live toggle + cross-tab sync
   useEffect(() => {
-    let stopPoll: (() => void) | null = null;
     const unsub = subscribeToMaintenanceMode(
       (isEnabled) => setIsMaintenanceMode(isEnabled),
-      (error) => {
-        console.error("Admin maintenance listener:", error);
-        noteFirestoreQuota(error);
-        stopPoll = startMaintenanceModePolling((isEnabled) =>
-          setIsMaintenanceMode(isEnabled),
-        );
-      },
+      (error) => console.error("Admin maintenance listener:", error),
     );
     getMaintenanceMode()
       .then((isEnabled) => setIsMaintenanceMode(isEnabled))
-      .catch((error) => {
-        console.error("Admin maintenance fetch:", error);
-        if (error instanceof Error) noteFirestoreQuota(error);
-        stopPoll = startMaintenanceModePolling((isEnabled) =>
-          setIsMaintenanceMode(isEnabled),
-        );
-      });
-    return () => {
-      unsub();
-      stopPoll?.();
-    };
+      .catch((error) => console.error("Admin maintenance fetch:", error));
+    return unsub;
   }, []);
 
   useEffect(() => {
-    let unsubscribeSessions: () => void;
-    let unsubscribeUsers: () => void;
-
-    if (isAdmin === true) {
-      unsubscribeSessions = subscribeToRecentSessions(
-        (recentSessions) => {
-          setSessions(recentSessions);
-          setLoading(false);
-
-          if (selectedSession) {
-            const updated = recentSessions.find(
-              (s) => s.id === selectedSession.id,
-            );
-            if (updated) setSelectedSession(updated);
-          }
-        },
-        (error) => {
-          setLoading(false);
-          noteFirestoreQuota(error);
-        },
-      );
-
-      unsubscribeUsers = subscribeToAllUsers((allUsers) => {
-        setUsers(allUsers);
-      });
-    } else if (isAdmin === false) {
-      setLoading(false);
+    if (isAdmin !== true) {
+      if (isAdmin === false) setLoading(false);
+      return;
     }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setSidebarSessions([]);
+      setSidebarCursor(null);
+      setSidebarHasMore(true);
+      setUsers([]);
+      setUsersCursor(null);
+      setUsersHasMore(true);
 
+      if (activeTab === "users" && !selectedUserEmail) {
+        await loadUsersPage(false);
+      } else {
+        await loadSidebarPage(false);
+      }
+      if (!cancelled) setLoading(false);
+    })();
     return () => {
-      if (unsubscribeSessions) unsubscribeSessions();
-      if (unsubscribeUsers) unsubscribeUsers();
+      cancelled = true;
     };
-  }, [isAdmin, selectedSession?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload list when tab/context changes
+  }, [isAdmin, activeTab, selectedUserEmail]);
+
+  useEffect(() => {
+    if (!selectedSessionId || isAdmin !== true) {
+      setSelectedSession(null);
+      return;
+    }
+    return subscribeToSession(selectedSessionId, setSelectedSession);
+  }, [selectedSessionId, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin !== true) return;
+    const root = sidebarScrollRef.current;
+    const target = loadMoreSentinelRef.current;
+    if (!root || !target) return;
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (activeTab === "users" && !selectedUserEmail) {
+          if (!usersLoading && usersHasMore) void loadUsersPage(true);
+        } else if (!sidebarLoading && sidebarHasMore) {
+          void loadSidebarPage(true);
+        }
+      },
+      { root, rootMargin: "120px", threshold: 0 },
+    );
+    obs.observe(target);
+    return () => obs.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isAdmin,
+    activeTab,
+    selectedUserEmail,
+    sidebarHasMore,
+    sidebarLoading,
+    usersHasMore,
+    usersLoading,
+  ]);
 
   // Scroll logic: Chat -> Bottom, Others -> Top
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -975,9 +993,11 @@ export const AdminPanel: React.FC = () => {
 
     try {
       await deleteChatSession(sessionId);
-      if (selectedSession?.id === sessionId) {
+      if (selectedSessionId === sessionId) {
+        setSelectedSessionId(null);
         setSelectedSession(null);
       }
+      setSidebarSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch (error) {
       console.error("Failed to delete session:", error);
       alert("Failed to delete session");
@@ -1130,11 +1150,6 @@ export const AdminPanel: React.FC = () => {
   return (
     <div className="fixed inset-0 bg-slate-50 px-4 sm:px-6 lg:px-8 flex flex-col overflow-hidden">
       <div className="max-w-7xl mx-auto w-full flex flex-col h-full">
-        {firestoreQuotaWarning && (
-          <div className="mt-4 shrink-0 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            {firestoreQuotaWarning}
-          </div>
-        )}
         {/* Header - Hidden on mobile when viewing a session */}
         <div
           className={`py-5 lg:py-8 flex justify-between items-center shrink-0 ${
@@ -1146,8 +1161,7 @@ export const AdminPanel: React.FC = () => {
               System Overview
             </h1>
             <p className="text-ink-muted font-mono text-[10px] sm:text-xs uppercase tracking-widest">
-              Admin Dashboard • {sessions.length} recent sessions (max{" "}
-              {ADMIN_SESSIONS_LIST_LIMIT})
+              Admin Dashboard • {ADMIN_PAGE_SIZE} per page (scroll to load more)
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1300,26 +1314,31 @@ export const AdminPanel: React.FC = () => {
             </div>
 
             {/* Content Area */}
-            <div className="overflow-y-auto flex-1 p-2 space-y-2 bg-slate-50/50">
-              {activeTab === "active" ? (
-                // Active Tab
+            <div
+              ref={sidebarScrollRef}
+              className="overflow-y-auto flex-1 p-2 space-y-2 bg-slate-50/50"
+            >
+              {loading ? (
+                <div className="p-8 text-center text-slate-400 text-xs font-mono">
+                  Loading…
+                </div>
+              ) : activeTab === "active" ? (
                 activeSessions.length > 0 ? (
                   activeSessions.map((session) => (
                     <SessionCard
                       key={session.id}
                       session={session}
-                      isSelected={selectedSession?.id === session.id}
-                      onClick={() => setSelectedSession(session)}
+                      isSelected={selectedSessionId === session.id}
+                      onClick={() => setSelectedSessionId(session.id)}
                     />
                   ))
                 ) : (
                   <div className="p-8 text-center text-slate-400 text-xs font-mono">
-                    No active sessions
+                    No active sessions in loaded pages — scroll for more
                   </div>
                 )
               ) : activeTab === "users" ? (
                 selectedUserEmail ? (
-                  // Level 2: Specific User's Sessions
                   <>
                     <button
                       onClick={() => setSelectedUserEmail(null)}
@@ -1345,55 +1364,61 @@ export const AdminPanel: React.FC = () => {
                         {selectedUserEmail}
                       </p>
                       <p className="text-[10px] text-indigo-700/70">
-                        {uniqueUsers.find((u) => u.email === selectedUserEmail)
-                          ?.sessions.length || 0}{" "}
-                        Sessions
+                        {sidebarSessions.length}
+                        {sidebarHasMore ? "+" : ""} sessions loaded
                       </p>
                     </div>
-                    {uniqueUsers
-                      .find((u) => u.email === selectedUserEmail)
-                      ?.sessions.map((session) => (
-                        <SessionCard
-                          key={session.id}
-                          session={session}
-                          isSelected={selectedSession?.id === session.id}
-                          onClick={() => setSelectedSession(session)}
-                        />
-                      ))}
+                    {sidebarSessions.map((session) => (
+                      <SessionCard
+                        key={session.id}
+                        session={session}
+                        isSelected={selectedSessionId === session.id}
+                        onClick={() => setSelectedSessionId(session.id)}
+                      />
+                    ))}
                   </>
-                ) : (
-                  // Level 1: List of Unique Users
-                  uniqueUsers.map((user) => (
+                ) : users.length > 0 ? (
+                  users.map((u) => (
                     <div
-                      key={user.email}
-                      onClick={() => setSelectedUserEmail(user.email)}
+                      key={u.uid}
+                      onClick={() => setSelectedUserEmail(u.email)}
                       className="p-4 bg-white rounded-2xl border border-slate-100 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all group"
                     >
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-bold text-sm text-ink group-hover:text-indigo-600 transition-colors truncate max-w-[180px]">
-                          {user.email}
-                        </span>
-                        <span className="px-2 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-500">
-                          {user.sessions.length}
+                          {u.email}
                         </span>
                       </div>
                       <p className="text-[10px] text-slate-400">
-                        Last active:{" "}
-                        {new Date(user.lastActive).toLocaleDateString()}
+                        Last login:{" "}
+                        {new Date(u.lastLogin).toLocaleDateString()}
                       </p>
                     </div>
                   ))
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-xs font-mono">
+                    No users loaded
+                  </div>
                 )
-              ) : (
-                // Guests Tab: List all guest sessions
-                guestSessions.map((session) => (
+              ) : sidebarSessions.length > 0 ? (
+                sidebarSessions.map((session) => (
                   <SessionCard
                     key={session.id}
                     session={session}
-                    isSelected={selectedSession?.id === session.id}
-                    onClick={() => setSelectedSession(session)}
+                    isSelected={selectedSessionId === session.id}
+                    onClick={() => setSelectedSessionId(session.id)}
                   />
                 ))
+              ) : (
+                <div className="p-8 text-center text-slate-400 text-xs font-mono">
+                  No guest sessions in this page — scroll for more
+                </div>
+              )}
+              <div ref={loadMoreSentinelRef} className="h-4 shrink-0" />
+              {(sidebarLoading || usersLoading) && (
+                <p className="text-center text-[10px] text-slate-400 font-mono py-2">
+                  Loading more…
+                </p>
               )}
             </div>
           </div>
@@ -1410,7 +1435,10 @@ export const AdminPanel: React.FC = () => {
                 <div className="p-4 lg:p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center gap-3 shrink-0">
                   {/* Back button for mobile */}
                   <button
-                    onClick={() => setSelectedSession(null)}
+                    onClick={() => {
+                      setSelectedSessionId(null);
+                      setSelectedSession(null);
+                    }}
                     className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-ink transition-colors"
                   >
                     <svg
@@ -2053,7 +2081,7 @@ export const AdminPanel: React.FC = () => {
                 disabled={exportLoading}
                 className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 disabled:opacity-50"
               >
-                {exportLoading ? "Loading sessions…" : "Download JSONL"}
+                {exportLoading ? "Loading all sessions…" : "Download JSONL"}
               </button>
             </div>
           </div>
