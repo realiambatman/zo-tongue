@@ -3,12 +3,16 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
-// Firebase config - using environment variables for better security
-// Note: Firebase client API keys are meant to be public, but using env vars is best practice
+// Firebase config must come from environment variables (see .env.example).
+const firebaseApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+if (!firebaseApiKey) {
+  throw new Error(
+    "Missing VITE_FIREBASE_API_KEY. Copy .env.example to .env and set your Firebase config."
+  );
+}
+
 const firebaseConfig = {
-  apiKey:
-    import.meta.env.VITE_FIREBASE_API_KEY ||
-    "REDACTED",
+  apiKey: firebaseApiKey,
   authDomain:
     import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "zotongue.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "zotongue",
