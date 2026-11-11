@@ -1,6 +1,7 @@
 {
   "name": "zotongue-ai",
   "private": true,
+  "description": "Frontend for ZoTongue AI: chat, translation, study and problem-solving tools for Zo languages and English.",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
